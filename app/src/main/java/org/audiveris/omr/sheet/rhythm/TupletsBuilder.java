@@ -24,6 +24,8 @@ package org.audiveris.omr.sheet.rhythm;
 import org.audiveris.omr.glyph.Shape;
 import org.audiveris.omr.math.GeoUtil;
 import org.audiveris.omr.math.Rational;
+import org.audiveris.omr.sheet.Picture;
+import org.audiveris.omr.sheet.Sheet;
 import org.audiveris.omr.sheet.Staff;
 import org.audiveris.omr.sig.SIGraph;
 import org.audiveris.omr.sig.inter.AbstractBeamInter;
@@ -37,6 +39,8 @@ import org.audiveris.omr.sig.relation.Relation;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import ij.process.ByteProcessor;
 
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -393,6 +397,9 @@ public class TupletsBuilder
         /** Current status. */
         private Status status;
 
+        /** True if a beam group was cut to its tuplet part. */
+        private boolean partialBeam;
+
         TupletCollector (TupletInter tuplet,
                          SortedSet<AbstractChordInter> chords)
         {
@@ -516,6 +523,14 @@ public class TupletsBuilder
                 // (only if tuplet is on beam side of the stems)
                 Set<AbstractChordInter> siblings = getBeamSiblings(chord);
 
+                // A beam can also join notes outside the tuplet (two eighths then a triplet under one
+                // beam is common): the whole group is then too many, so take this chord alone and let
+                // the next nearest candidates complete the tuplet.
+                if (siblings.size() > expectedCount) {
+                    siblings = Set.of(chord);
+                    partialBeam = true;
+                }
+
                 for (AbstractChordInter ch : siblings) {
                     doInclude(ch);
                 }
@@ -528,7 +543,11 @@ public class TupletsBuilder
                     status = Status.TOO_LONG;
                 } else if (total.equals(expectedTotal)) {
                     // Check tuplet sign is within chords abscissae
-                    if (isWithinChordsAbscissaRange()) {
+                    // A tuplet that does not span its whole beam group is engraved with a bracket
+                    // or centred on the beam; otherwise the sign is something else (text, fingering)
+                    if (partialBeam && !hasEvidence()) {
+                        status = Status.NO_BRACKET;
+                    } else if (isWithinChordsAbscissaRange()) {
                         status = Status.OK;
                     } else {
                         status = Status.OUTSIDE;
@@ -547,6 +566,77 @@ public class TupletsBuilder
             return status == Status.OK;
         }
 
+        /**
+         * Check for a bracket: thin horizontal ink, beams excluded, on both sides of the sign
+         * along the chords span, or else a reliable sign centred over the chords.
+         */
+        private boolean hasEvidence ()
+        {
+            final int first = chords.first().getTailLocation().x;
+            final int last = chords.last().getTailLocation().x;
+            final Rectangle box = tuplet.getBounds();
+            final boolean centered = Math.abs(box.x + box.width / 2 - (first + last) / 2) <= 0.15
+                    * (last - first);
+            final boolean reliable = centered && tuplet.getGrade() >= 0.45;
+
+            // The sign may not be in a SIG yet (manual assignment): use its chords' sheet
+            final Sheet sheet = chords.first().getSig().getSystem().getSheet();
+            final Picture picture = sheet.getPicture();
+            // NO_STAFF is built from BINARY and fails without it
+            final ByteProcessor pix = picture.getSource(Picture.SourceKey.BINARY) != null
+                    ? picture.getSource(Picture.SourceKey.NO_STAFF) : null;
+
+            if (pix == null) {
+                return reliable;
+            }
+
+            final List<java.awt.geom.Area> beams = new ArrayList<>();
+
+            for (AbstractChordInter ch : chords) {
+                for (AbstractBeamInter beam : ch.getBeams()) {
+                    beams.add(beam.getArea() != null ? new java.awt.geom.Area(beam.getArea())
+                            : new java.awt.geom.Area(beam.getBounds()));
+                }
+            }
+
+            final int leftLength = Math.max(0, Math.min(box.x, last + 1) - first);
+            final int rightLength = Math.max(0, last + 1 - Math.max(box.x + box.width, first));
+            final int yMid = box.y + box.height / 2;
+            boolean found = false;
+
+            for (int y = Math.max(0, yMid - box.height / 4); y <= Math.min(pix.getHeight() - 1,
+                    yMid + box.height / 4) && !found; y++) {
+                int left = 0;
+                int right = 0;
+
+                for (int x = Math.max(0, first); x <= Math.min(pix.getWidth() - 1, last); x++) {
+                    if (pix.get(x, y) != 0 || (x >= box.x && x < box.x + box.width)) {
+                        continue;
+                    }
+
+                    final int xx = x;
+                    final int yy = y;
+
+                    if (beams.stream().anyMatch(a -> a.contains(xx, yy))) {
+                        continue;
+                    }
+
+                    if (x < box.x) {
+                        left++;
+                    } else {
+                        right++;
+                    }
+                }
+
+                found = left >= 0.5 * leftLength && right >= 0.5 * rightLength
+                        && left + right > 0;
+            }
+
+            logger.debug("{} bracket {} reliable {}", tuplet, found, reliable);
+
+            return found || reliable;
+        }
+
         /** Check whether the tuplet sign lies between the chords abscissae. */
         private boolean isWithinChordsAbscissaRange ()
         {
@@ -563,6 +653,7 @@ public class TupletsBuilder
             OK,
             TOO_LONG,
             TOO_MANY,
+            NO_BRACKET,
             OUTSIDE;
         }
     }

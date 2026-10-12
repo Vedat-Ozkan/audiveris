@@ -149,6 +149,11 @@ public class SlurInter
             if (stack == system.getLastStack()) {
                 // Check slur ends in last measure half
                 Measure measure = stack.getMeasureAt(staff1);
+                if (measure == null) {
+                    logger.warn("Skipping orphan check for {}: no measure in {} for {}",
+                            slur, stack, staff1);
+                    return false;
+                }
                 int middle = measure.getAbscissa(LEFT, staff1) + (measure.getWidth() / 2);
                 if (end.getX() > middle) {
                     return true;
@@ -169,6 +174,11 @@ public class SlurInter
                 // Check slur ends in first measure half (excluding header area)
                 Staff staff1 = system.getClosestStaff(end);
                 Measure measure = stack.getMeasureAt(staff1);
+                if (measure == null) {
+                    logger.warn("Skipping orphan check for {}: no measure in {} for {}",
+                            slur, stack, staff1);
+                    return false;
+                }
                 int middle = (staff1.getHeaderStop() + measure.getAbscissa(LEFT, staff1) + measure
                         .getWidth()) / 2;
                 if (end.getX() < middle) {

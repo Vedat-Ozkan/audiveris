@@ -427,6 +427,12 @@ public abstract class Voices
             for (MeasureStack stack : system.getStacks()) {
                 final Measure measure = stack.getMeasureAt(part);
 
+                if (measure == null) {
+                    logger.warn("Skipping voice refinement in {} for {}: no measure", stack, part);
+                    prevMeasure = null;
+                    continue;
+                }
+
                 measure.purgeVoices();
                 measure.sortVoices();
                 measure.renameVoices();
