@@ -21,9 +21,13 @@
 // </editor-fold>
 package org.audiveris.omr.sheet.note;
 
+import org.audiveris.omr.classifier.Classifier;
+import org.audiveris.omr.classifier.Evaluation;
+import org.audiveris.omr.classifier.ShapeClassifier;
 import org.audiveris.omr.constant.Constant;
 import org.audiveris.omr.constant.ConstantSet;
 import org.audiveris.omr.glyph.Glyph;
+import org.audiveris.omr.glyph.GlyphFactory;
 import org.audiveris.omr.glyph.GlyphGroup;
 import org.audiveris.omr.glyph.Glyphs;
 import org.audiveris.omr.glyph.Grades;
@@ -48,6 +52,8 @@ import org.audiveris.omr.math.NaturalSpline;
 import org.audiveris.omr.math.PointUtil;
 import org.audiveris.omr.math.ReversePathIterator;
 import org.audiveris.omr.run.Orientation;
+import org.audiveris.omr.run.RunTable;
+import org.audiveris.omr.run.RunTableFactory;
 import org.audiveris.omr.score.DrumSet;
 import org.audiveris.omr.score.DrumSet.DrumInstrument;
 import org.audiveris.omr.sheet.Part;
@@ -65,6 +71,7 @@ import org.audiveris.omr.sig.inter.AbstractNoteInter;
 import org.audiveris.omr.sig.inter.AbstractVerticalInter;
 import org.audiveris.omr.sig.inter.BarConnectorInter;
 import org.audiveris.omr.sig.inter.BarlineInter;
+import org.audiveris.omr.sig.inter.ClefInter;
 import org.audiveris.omr.sig.inter.HeadInter;
 import org.audiveris.omr.sig.inter.Inter;
 import org.audiveris.omr.sig.inter.InterPairPredicate;
@@ -84,6 +91,7 @@ import org.slf4j.LoggerFactory;
 
 import ij.process.ByteProcessor;
 
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
@@ -94,6 +102,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -145,6 +154,18 @@ public class NoteHeadsBuilder
             Shape.TREMOLO_2,
             Shape.TREMOLO_3,
             Shape.VERTICAL_SERIF);
+
+    /** Head shapes that the loop of a treble clef can match. */
+    private static final Set<Shape> CLEF_LOOP_HEADS = EnumSet.of(
+            Shape.NOTEHEAD_VOID,
+            Shape.NOTEHEAD_VOID_SMALL);
+
+    /** Clef shapes looked for around head candidates. */
+    private static final Set<Shape> TREBLE_CLEFS = EnumSet.of(
+            Shape.G_CLEF,
+            Shape.G_CLEF_SMALL,
+            Shape.G_CLEF_8VA,
+            Shape.G_CLEF_8VB);
 
     /** Shapes handled by template matching. */
     private static final Set<Shape> MATCHED_SHAPES = EnumSet.noneOf(Shape.class);
@@ -322,6 +343,69 @@ public class NoteHeadsBuilder
         return filtered;
     }
 
+    //---------------//
+    // clefInkAround //
+    //---------------//
+    /**
+     * Gather the staff-free ink around a head candidate, as tall and narrow as a clef.
+     * <p>
+     * Staff line removal cuts a clef into pieces, so we keep the ink that touches the head plus the
+     * nearby pieces lying entirely within a clef-sized window above and below the head.
+     *
+     * @param head    the head candidate
+     * @param noStaff the image without staff lines
+     * @return the compound glyph, or null if no ink has the size of a treble clef
+     */
+    private Glyph clefInkAround (HeadInter head,
+                                 ByteProcessor noStaff)
+    {
+        final Rectangle box = head.getBounds();
+        final int cx = box.x + (box.width / 2);
+        final int cy = box.y + (box.height / 2);
+        final int halfWidth = scale.toPixels(constants.clefWindowHalfWidth);
+        final int above = scale.toPixels(constants.clefWindowAbove);
+        final int below = scale.toPixels(constants.clefWindowBelow);
+        final Rectangle win = new Rectangle(cx - halfWidth, cy - above, 2 * halfWidth, above + below)
+                .intersection(new Rectangle(0, 0, noStaff.getWidth(), noStaff.getHeight()));
+
+        if (win.isEmpty()) {
+            return null;
+        }
+
+        final RunTable table = new RunTableFactory(Orientation.VERTICAL).createTable(noStaff, win);
+        final double maxDx = scale.toPixelsDouble(constants.maxClefPartDx);
+        final int minWeight = constants.minClefPartWeight.getValue();
+        final List<Glyph> parts = new ArrayList<>();
+
+        for (Glyph part : GlyphFactory.buildGlyphs(table, new Point(win.x, win.y))) {
+            final Rectangle b = part.getBounds();
+
+            if (b.intersects(box)) {
+                parts.add(part);
+            } else if ((b.x > win.x) && (b.y > win.y)
+                    && (b.x + b.width < win.x + win.width) && (b.y + b.height < win.y + win.height)
+                    && (part.getWeight() >= minWeight) && (Math.abs(b.getCenterX() - cx) < maxDx)) {
+                // A piece cut at the window border belongs to some other, larger symbol
+                parts.add(part);
+            }
+        }
+
+        if (parts.isEmpty()) {
+            return null;
+        }
+
+        final Glyph ink = (parts.size() == 1) ? parts.get(0) : GlyphFactory.buildGlyph(parts);
+        final Rectangle ib = ink.getBounds();
+
+        if ((ib.height < scale.toPixelsDouble(constants.minClefHeight))
+                || (ib.height > scale.toPixelsDouble(constants.maxClefHeight))
+                || (ib.width > scale.toPixelsDouble(constants.maxClefWidth))) {
+            return null;
+        }
+
+        return ink;
+    }
+
     //------------//
     // buildHeads //
     //------------//
@@ -390,6 +474,12 @@ public class NoteHeadsBuilder
 
             if (overlaps > 0) {
                 logger.debug("Staff#{} {} overlaps", staff.getId(), overlaps);
+            }
+
+            // Treble clef changes taken for void heads (pitch positions need a 5-line staff)
+            if (!staff.isOneLineStaff() && !staff.isDrum()) {
+                watch.start("Staff #" + staff.getId() + " clefs");
+                findClefs(staff, ch);
             }
 
             // Purge tally of discarded heads
@@ -570,6 +660,106 @@ public class NoteHeadsBuilder
         }
 
         return filtered;
+    }
+
+    //-----------//
+    // findClefs //
+    //-----------//
+    /**
+     * Retrieve the treble clefs printed within the staff whose ink was taken for head candidates.
+     * <p>
+     * The loop of a treble clef matches a void head template, and its spine later passes for the
+     * stem of that head. The ink of such a false half note is then erased before the SYMBOLS step,
+     * which therefore never sees the clef, and every following note is read in the wrong clef.
+     * <p>
+     * So, around each head candidate, the clef-sized ink is classified as a whole. If it is a
+     * treble clef, the clef is created right away and the head candidates it contains are removed,
+     * unless one of them is a good head: a stemmed chord can look like a clef.
+     *
+     * @param staff the staff being processed
+     * @param heads (input/output) the head candidates of this staff
+     */
+    private void findClefs (Staff staff,
+                            List<HeadInter> heads)
+    {
+        final Classifier classifier = ShapeClassifier.getInstance();
+        final ByteProcessor noStaff = sheet.getPicture().getSource(Picture.SourceKey.NO_STAFF);
+        final Set<Rectangle> checked = new HashSet<>(); // Head candidates share locations
+
+        for (HeadInter head : new ArrayList<>(heads)) {
+            if (head.isRemoved() || !CLEF_LOOP_HEADS.contains(head.getShape())
+                    || !checked.add(head.getBounds())) {
+                continue;
+            }
+
+            final Glyph ink = clefInkAround(head, noStaff);
+
+            if (ink == null) {
+                continue;
+            }
+
+            final Rectangle ib = ink.getBounds();
+
+            // Already found from another head candidate, or in the staff header
+            if (sig.intersectedInters(ib).stream().anyMatch(inter -> inter instanceof ClefInter)) {
+                continue;
+            }
+
+            final Evaluation[] evals = classifier.evaluate(ink, scale.getInterline(), 1, 0.0, null);
+
+            if ((evals.length == 0) || !TREBLE_CLEFS.contains(evals[0].shape)
+                    || (evals[0].grade < constants.minClefGrade.getValue())) {
+                continue;
+            }
+
+            // Same rules as for clefs found by the SYMBOLS step (see ShapeChecker)
+            final Point2D center = ink.getCenter2D();
+
+            if ((Math.abs(staff.pitchPositionOf(center)) >= 4) || ((evals[0].shape
+                    == Shape.G_CLEF_SMALL) && (center.getX() < system.getHeaderStop()))) {
+                continue;
+            }
+
+            final List<HeadInter> inside = new ArrayList<>();
+            double bestGrade = 0;
+
+            for (HeadInter h : heads) {
+                final Rectangle hb = h.getBounds();
+                final Rectangle common = hb.intersection(ib);
+
+                if (!common.isEmpty() && ((2 * common.width * common.height) >= (hb.width
+                        * hb.height))) {
+                    inside.add(h);
+                    bestGrade = Math.max(bestGrade, h.getGrade());
+                }
+            }
+
+            if (bestGrade >= constants.maxClefHeadGrade.getValue()) {
+                continue;
+            }
+
+            final ClefInter clef = ClefInter.createValid(
+                    system.registerGlyph(ink, null),
+                    evals[0].shape,
+                    Grades.intrinsicRatio * evals[0].grade,
+                    staff);
+
+            for (HeadInter h : inside) {
+                h.remove();
+            }
+
+            heads.removeAll(inside);
+            sig.addVertex(clef);
+
+            // Its grade is below what REDUCTION keeps, and only frozen or good inters get their ink
+            // erased by SymbolsFilter: frozen, the clef stays and SYMBOLS does not create it again.
+            clef.freeze();
+            logger.debug(
+                    "Staff#{} {} replaces {} head candidates",
+                    staff.getId(),
+                    clef,
+                    inside.size());
+        }
     }
 
     //---------------------//
@@ -1221,6 +1411,47 @@ public class NoteHeadsBuilder
     private static class Constants
             extends ConstantSet
     {
+        private final Constant.Ratio minClefGrade = new Constant.Ratio(
+                0.5,
+                "Minimum treble clef grade of the ink around a head candidate");
+
+        private final Constant.Ratio maxClefHeadGrade = new Constant.Ratio(
+                0.5,
+                "Maximum grade of a head candidate within a clef found around head candidates");
+
+        private final Scale.Fraction clefWindowHalfWidth = new Scale.Fraction(
+                2.0,
+                "Half width of the window searched for clef ink around a head candidate");
+
+        private final Scale.Fraction clefWindowAbove = new Scale.Fraction(
+                6.0,
+                "Height of the window searched for clef ink above a head candidate");
+
+        private final Scale.Fraction clefWindowBelow = new Scale.Fraction(
+                4.0,
+                "Height of the window searched for clef ink below a head candidate");
+
+        private final Scale.Fraction maxClefPartDx = new Scale.Fraction(
+                1.2,
+                "Maximum abscissa distance from head candidate to a clef piece center");
+
+        private final Constant.Integer minClefPartWeight = new Constant.Integer(
+                "pixels",
+                10,
+                "Minimum weight of a clef piece not touching the head candidate");
+
+        private final Scale.Fraction minClefHeight = new Scale.Fraction(
+                4.5,
+                "Minimum height of treble clef ink around a head candidate");
+
+        private final Scale.Fraction maxClefHeight = new Scale.Fraction(
+                7.5,
+                "Maximum height of treble clef ink around a head candidate");
+
+        private final Scale.Fraction maxClefWidth = new Scale.Fraction(
+                2.6,
+                "Maximum width of treble clef ink around a head candidate");
+
         private final Constant.Boolean dumpTemplateNotes = new Constant.Boolean(
                 false,
                 "Should we dump the template notes for standard and drum staves?");
