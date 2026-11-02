@@ -312,7 +312,7 @@ public class PartwiseBuilder
     private final IsFirst isFirst = new IsFirst();
 
     /** Map of OctaveShift numbers, reset for every (physical) Part. */
-    private final Map<OctaveShiftInter, Integer> octaveShiftNumbers = new HashMap<>();
+    private final Map<OctaveShiftInter, Integer> octaveShiftNumbers = new LinkedHashMap<>();
 
     /** Map of Slur numbers, reset for every LogicalPart. */
     private final Map<SlurInter, Integer> slurNumbers = new HashMap<>();

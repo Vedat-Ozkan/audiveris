@@ -30,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Comparator;
-import java.util.Objects;
 
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlRootElement;
@@ -256,7 +255,7 @@ public class Sample
     public int hashCode ()
     {
         int hash = 7;
-        hash = (97 * hash) + Objects.hashCode(this.shape);
+        hash = (97 * hash) + ((this.shape != null) ? this.shape.ordinal() : 0);
         hash = (97 * hash) + this.interline;
         hash = (97 * hash) + super.hashCode();
 
