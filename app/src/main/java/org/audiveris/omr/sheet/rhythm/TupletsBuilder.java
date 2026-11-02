@@ -36,6 +36,7 @@ import org.audiveris.omr.sig.inter.TupletInter;
 import org.audiveris.omr.sig.relation.ChordTupletRelation;
 import org.audiveris.omr.sig.relation.Link;
 import org.audiveris.omr.sig.relation.Relation;
+import org.audiveris.omr.util.Entities;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -125,6 +127,34 @@ public class TupletsBuilder
         return chords;
     }
 
+    private SortedSet<AbstractChordInter> getSpanChords (TupletInter tuplet,
+                                                       List<AbstractChordInter> candidates)
+    {
+        final Point center = tuplet.getCenter();
+        final Staff targetStaff = getTargetStaff(candidates);
+
+        return stack.getMeasures().stream()
+                .flatMap(measure -> new TupletGenerator(measure).getSpans().stream())
+                .filter(span -> (span.get(0).getTopStaff() == targetStaff)
+                        && candidates.containsAll(span))
+                .map(span -> getWholeSpanChords(tuplet, span))
+                .filter(Objects::nonNull)
+                .min(Comparator.comparingDouble(
+                        chords -> GeoUtil.ptDistanceSq(Entities.getBounds(chords), center.x,
+                                center.y)))
+                .orElse(null);
+    }
+
+    private static SortedSet<AbstractChordInter> getWholeSpanChords (TupletInter tuplet,
+                                                                     List<AbstractChordInter> span)
+    {
+        final SortedSet<AbstractChordInter> chords = getEmbracedChords(
+                tuplet,
+                new ArrayList<>(span));
+
+        return ((chords != null) && chords.containsAll(span)) ? chords : null;
+    }
+
     //------------------//
     // linkStackTuplets //
     //------------------//
@@ -183,7 +213,11 @@ public class TupletsBuilder
         List<AbstractChordInter> chordcandidates = getChordsAround(tuplet);
 
         // Now, get the properly embraced chords
-        SortedSet<AbstractChordInter> chords = getEmbracedChords(tuplet, chordcandidates);
+        SortedSet<AbstractChordInter> chords = getSpanChords(tuplet, chordcandidates);
+
+        if (chords == null) {
+            chords = getEmbracedChords(tuplet, chordcandidates);
+        }
 
         if (chords == null) {
             return Collections.emptySet();

@@ -98,7 +98,7 @@ public class TupletGenerator
     //----------//
     // getSpans //
     //----------//
-    private List<List<AbstractChordInter>> getSpans ()
+    public List<List<AbstractChordInter>> getSpans ()
     {
         final List<List<AbstractChordInter>> spans = new ArrayList<>();
         final Set<AbstractChordInter> taken = new HashSet<>();
@@ -106,8 +106,7 @@ public class TupletGenerator
         for (BeamGroupInter group : measure.getBeamGroups()) {
             final List<AbstractChordInter> chords = group.getChords();
 
-            if ((group.getMeasures().size() > 1) || chords.stream().anyMatch(
-                    AbstractChordInter::hasTuplet)) {
+            if (group.getMeasures().size() > 1) {
                 continue;
             }
 
@@ -160,6 +159,10 @@ public class TupletGenerator
         final Map<Family, List<List<AbstractChordInter>>> families = new LinkedHashMap<>();
 
         for (List<AbstractChordInter> span : getSpans()) {
+            if (span.stream().anyMatch(AbstractChordInter::hasTuplet)) {
+                continue;
+            }
+
             families.computeIfAbsent(
                     new Family(span.get(0).getStaff(), span.size(), getRawDuration(span)),
                     f -> new ArrayList<>()).add(span);
