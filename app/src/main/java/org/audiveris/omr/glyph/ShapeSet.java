@@ -1009,6 +1009,8 @@ public class ShapeSet
                 list.removeAll(HeadsOvalSmall);
             }
 
+            list.removeAll(Arrays.asList(WHOLE_NOTE_SMALL, BREVE_SMALL));
+
             if (!switches.getValue(ProcessingSwitch.drumNotation) //
                     && !switches.getValue(ProcessingSwitch.oneLineStaves)) {
                 list.removeAll(HeadsDiamond);
