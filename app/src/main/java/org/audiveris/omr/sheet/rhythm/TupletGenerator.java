@@ -24,13 +24,12 @@ package org.audiveris.omr.sheet.rhythm;
 import org.audiveris.omr.glyph.Shape;
 import org.audiveris.omr.math.GeoUtil;
 import org.audiveris.omr.math.Rational;
-import static org.audiveris.omr.math.Rational.ONE_OVER_FOUR;
-import static org.audiveris.omr.math.Rational.THREE_OVER_TWO;
+import static org.audiveris.omr.math.Rational.TWO_OVER_THREE;
 import org.audiveris.omr.sheet.Scale;
+import org.audiveris.omr.sheet.Staff;
 import org.audiveris.omr.sheet.SystemInfo;
 import org.audiveris.omr.sig.SIGraph;
 import org.audiveris.omr.sig.inter.AbstractChordInter;
-import org.audiveris.omr.sig.inter.AbstractTimeInter;
 import org.audiveris.omr.sig.inter.BeamGroupInter;
 import org.audiveris.omr.sig.inter.Inters;
 import org.audiveris.omr.sig.inter.TupletInter;
@@ -47,28 +46,24 @@ import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import static java.util.stream.Collectors.toList;
 
 /**
- * Class <code>TupletGenerator</code> checks each voice of a measure for suitable implicit
- * tuplet signs.
+ * Class <code>TupletGenerator</code> proposes implicit tuplet signs for a measure whose
+ * rhythm is not consistent.
  * <p>
- * We have to choose the type (3 or 6) for all inserted tuplet instances and their locations.
- * <ol>
- * <li>Find the number of beats in the measure,
- * <li>Group chords on these beats,
- * <li>Assign one implicit tuplet per beat.
- * </ol>
- * BEWARE:
- * Moonlight sonata has a cut common signature (2/2), for which a beat value is 1/2, but
- * the notes in a measure are grouped as in a 4/4 signature (4 triplets) rather than 2 sixlets.
- * <p>
- * So, using the beat unit does not always work.
- * We thus look at beam groups as well when processing a voice with x/2 signature
+ * A tuplet span is a beam group, extended by the fewest unbeamed chords (rests or flagged notes)
+ * just before or after it on its staff, whose raw duration is 3/2 of a plain note value.
+ * Spans with the same staff, chord count and raw duration form a family, and each hypothesis
+ * is a union of families, so that similar groups are all tuplets or all plain.
  *
  * @author Hervé Bitteur
  */
@@ -77,6 +72,8 @@ public class TupletGenerator
     //~ Static fields/initializers -----------------------------------------------------------------
 
     private static final Logger logger = LoggerFactory.getLogger(TupletGenerator.class);
+
+    private static final int MAX_FAMILIES = 5;
 
     //~ Instance fields ----------------------------------------------------------------------------
 
@@ -104,72 +101,173 @@ public class TupletGenerator
 
     //~ Methods ------------------------------------------------------------------------------------
 
-    //-------------//
-    // buildGroups //
-    //-------------//
+    //----------//
+    // getSpans //
+    //----------//
     /**
-     * Gather the chords of the provided voice into chord groups (likely to be linked
-     * to a tuplet sign).
+     * Report the tuplet spans of the measure.
      *
-     * @param voice    the provided voice
-     * @param duration the normal duration of a chord group (generally one beat)
-     * @return the sequence of chord groups
+     * @return the tuplet spans, each one as a sequence of chords
      */
-    private List<List<AbstractChordInter>> buildGroups (Voice voice,
-                                                        Rational duration)
+    private List<List<AbstractChordInter>> getSpans ()
     {
-        // Raw duration (ignoring implicit tuplet signs)
-        final Rational rawDuration = duration.times(THREE_OVER_TWO);
+        final List<List<AbstractChordInter>> spans = new ArrayList<>();
+        final Set<AbstractChordInter> taken = new HashSet<>();
 
-        final List<List<AbstractChordInter>> groups = new ArrayList<>();
+        for (BeamGroupInter group : measure.getBeamGroups()) {
+            final List<AbstractChordInter> chords = group.getChords();
 
-        Rational nextTime = Rational.ZERO;
-        List<AbstractChordInter> currentGroup = null;
-
-        for (AbstractChordInter ch : voice.getChords()) {
-            final Rational time = ch.getTimeOffset();
-
-            if (time.compareTo(nextTime) >= 0) {
-                nextTime = nextTime.plus(rawDuration);
-                groups.add(currentGroup = new ArrayList<>());
+            if ((group.getMeasures().size() > 1) || chords.stream().anyMatch(
+                    AbstractChordInter::hasTuplet)) {
+                continue;
             }
 
-            if (currentGroup != null) {
-                currentGroup.add(ch);
-            }
-        }
+            final Staff staff = chords.get(0).getStaff();
+            final int firstX = chords.get(0).getCenter().x;
+            final int lastX = chords.get(chords.size() - 1).getCenter().x;
+            final List<Integer> beamed = measure.getStandardChords().stream().filter(
+                    ch -> (ch.getStaff() == staff) && (ch.getBeamGroup() != null)).map(
+                            ch -> ch.getCenter().x).collect(toList());
+            final List<AbstractChordInter> before = getUnbeamed(
+                    staff,
+                    beamed.stream().filter(x -> x < firstX).max(Integer::compare).orElse(
+                            Integer.MIN_VALUE),
+                    firstX);
+            final List<AbstractChordInter> after = getUnbeamed(
+                    staff,
+                    lastX,
+                    beamed.stream().filter(x -> x > lastX).min(Integer::compare).orElse(
+                            Integer.MAX_VALUE));
 
-        return groups;
-    }
+            Search:
+            for (int added = 0; added <= (before.size() + after.size()); added++) {
+                for (int b = Math.min(added, before.size()); b >= 0; b--) {
+                    if ((added - b) > after.size()) {
+                        break;
+                    }
 
-    //-------------//
-    // checkGroups //
-    //-------------//
-    /**
-     * Check there is at most one beam group per chord group.
-     *
-     * @param groups the sequence of chord groups
-     * @return the starting chord of the first different group found, or null
-     */
-    private AbstractChordInter checkGroups (List<List<AbstractChordInter>> groups)
-    {
-        for (List<AbstractChordInter> group : groups) {
-            BeamGroupInter beamGroup = null;
+                    final List<AbstractChordInter> span = join(
+                            join(before.subList(before.size() - b, before.size()), chords),
+                            after.subList(0, added - b));
 
-            for (AbstractChordInter ch : group) {
-                final BeamGroupInter bg = ch.getBeamGroup();
+                    if (isTupletSpan(span) && Collections.disjoint(span, taken)) {
+                        spans.add(span);
+                        taken.addAll(span);
 
-                if (bg != null) {
-                    if (beamGroup == null) {
-                        beamGroup = bg;
-                    } else if (beamGroup != bg) {
-                        return ch;
+                        break Search;
                     }
                 }
             }
         }
 
-        return null; // No different beam group found
+        return spans;
+    }
+
+    //---------------//
+    // getHypotheses //
+    //---------------//
+    /**
+     * Report the tuplet hypotheses for the measure, the smallest first.
+     *
+     * @return the sequence of hypotheses, each one as a list of tuplet spans
+     */
+    public List<List<List<AbstractChordInter>>> getHypotheses ()
+    {
+        final Map<Family, List<List<AbstractChordInter>>> families = new LinkedHashMap<>();
+
+        for (List<AbstractChordInter> span : getSpans()) {
+            families.computeIfAbsent(
+                    new Family(span.get(0).getStaff(), span.size(), getRawDuration(span)),
+                    f -> new ArrayList<>()).add(span);
+        }
+
+        final List<List<List<AbstractChordInter>>> spansByFamily = new ArrayList<>(
+                families.values());
+        final int count = spansByFamily.size();
+        final List<List<List<AbstractChordInter>>> hypotheses = new ArrayList<>();
+
+        if (count > MAX_FAMILIES) {
+            hypotheses.add(spansByFamily.stream().flatMap(List::stream).collect(toList()));
+
+            return hypotheses;
+        }
+
+        for (int mask = 1; mask < (1 << count); mask++) {
+            final List<List<AbstractChordInter>> hypothesis = new ArrayList<>();
+
+            for (int i = 0; i < count; i++) {
+                if ((mask & (1 << i)) != 0) {
+                    hypothesis.addAll(spansByFamily.get(i));
+                }
+            }
+
+            hypotheses.add(hypothesis);
+        }
+
+        hypotheses.sort(Comparator.comparingInt(List::size));
+
+        return hypotheses;
+    }
+
+    //----------------//
+    // getRawDuration //
+    //----------------//
+    private static Rational getRawDuration (List<AbstractChordInter> chords)
+    {
+        Rational raw = Rational.ZERO;
+
+        for (AbstractChordInter chord : chords) {
+            final Rational duration = chord.getDurationSansTuplet();
+
+            if (duration == null) {
+                return null;
+            }
+
+            raw = raw.plus(duration);
+        }
+
+        return raw;
+    }
+
+    //-------------//
+    // getUnbeamed //
+    //-------------//
+    private List<AbstractChordInter> getUnbeamed (Staff staff,
+                                                  int left,
+                                                  int right)
+    {
+        return measure.getStandardChords().stream().filter(
+                ch -> (ch.getStaff() == staff) && (ch.getBeamGroup() == null)
+                        && (left < ch.getCenter().x) && (ch.getCenter().x < right)).sorted(
+                                Inters.byCenterAbscissa).collect(toList());
+    }
+
+    //--------------//
+    // isTupletSpan //
+    //--------------//
+    private static boolean isTupletSpan (List<AbstractChordInter> chords)
+    {
+        final Rational raw = getRawDuration(chords);
+
+        if (raw == null) {
+            return false;
+        }
+
+        final Rational actual = raw.times(TWO_OVER_THREE);
+
+        return (actual.num == 1) && (Integer.bitCount(actual.den) == 1);
+    }
+
+    //------//
+    // join //
+    //------//
+    private static List<AbstractChordInter> join (List<AbstractChordInter> one,
+                                                  List<AbstractChordInter> two)
+    {
+        final List<AbstractChordInter> joined = new ArrayList<>(one);
+        joined.addAll(two);
+
+        return joined;
     }
 
     //------------//
@@ -195,100 +293,6 @@ public class TupletGenerator
 
             logger.info("   {} duration:{}", voice, end);
         }
-    }
-
-    //---------------------//
-    // findImplicitTuplets //
-    //---------------------//
-    /**
-     * Inspect all measure voices for those that start in first slot and exhibit a
-     * duration (without any implicit tuplet) which is exactly 3/2 times the measure
-     * expected duration.
-     * <p>
-     * NOTA: this works only if ALL chords in voice should get a tuplet!
-     * <p>
-     * Then force tuplet injection to each such voice
-     *
-     * @return the collection of tuplet signs created, perhaps empty
-     */
-    public List<TupletInter> findImplicitTuplets ()
-    {
-        final Rational expected = measure.getStack().getExpectedDuration();
-        List<TupletInter> created = null;
-
-        for (Voice voice : measure.getVoices()) {
-            if (voice.isMeasureRest()) {
-                continue;
-            }
-
-            final List<AbstractChordInter> chords = voice.getChords();
-            final Rational start = chords.get(0).getTimeOffset();
-
-            if (!Rational.ZERO.equals(start)) {
-                continue;
-            }
-
-            // Compute total voice duration, ignoring tuplets if any
-            // So, we cannot simply use last chord end time
-            final Rational stop = voice.getDurationSansTuplet();
-            final Rational ratio = stop.divides(expected);
-
-            if (ratio.equals(THREE_OVER_TWO)) {
-                if (created == null) {
-                    created = new ArrayList<>();
-                }
-
-                created.addAll(forceTuplets(voice));
-                logger.debug("{} {} rechecked with implicit tuplets", measure, voice);
-            }
-        }
-
-        if (created == null) {
-            return Collections.emptyList();
-        }
-
-        return created;
-    }
-
-    //--------------//
-    // forceTuplets //
-    //--------------//
-    /**
-     * Inject implicit tuplet(s) for the provided voice.
-     *
-     * @param voice the voice to be processed
-     * @return the collection of created tuplet signs
-     */
-    private List<TupletInter> forceTuplets (Voice voice)
-    {
-        // Use the time signature if available, otherwise assume 4 beats
-        final AbstractTimeInter timeSig = measure.getStack().getCurrentTimeSignature();
-        final Rational duration;
-
-        if (timeSig != null) {
-            duration = timeSig.getBeatValue();
-        } else {
-            duration = ONE_OVER_FOUR;
-        }
-
-        // Group chords by duration
-        List<List<AbstractChordInter>> groups = buildGroups(voice, duration);
-
-        // Check beam grouping in voice, is it consistent with beat value?
-        // At least we can do this for beat value of 1/2
-        if ((checkGroups(groups) != null) && duration.equals(Rational.HALF)) {
-            groups = buildGroups(voice, ONE_OVER_FOUR);
-        }
-
-        final List<TupletInter> created = new ArrayList<>();
-
-        // Process each beat group
-        for (List<AbstractChordInter> group : groups) {
-            final List<AbstractChordInter> extGroup = new ArrayList<>();
-            created.addAll(generateTuplets(group, extGroup));
-        }
-
-        return created;
     }
 
     //-------------------//
@@ -340,54 +344,6 @@ public class TupletGenerator
         }
 
         return tuplet;
-    }
-
-    //-----------------//
-    // generateTuplets //
-    //-----------------//
-    /**
-     * Generate one or several implicit tuplet 's for the provided group of chords.
-     * <p>
-     * If the provided group of chords contains more than one beam group, it is split in 2.
-     *
-     * @param group    (input) the original group of chords
-     * @param extGroup (output) the extended group of chords
-     * @return the generated implicit tuplet(s)
-     */
-    public List<TupletInter> generateTuplets (List<AbstractChordInter> group,
-                                              List<AbstractChordInter> extGroup)
-    {
-        final List<TupletInter> tuplets = new ArrayList<>();
-
-        // Extend to beam group?
-        for (AbstractChordInter chord : group) {
-            final BeamGroupInter bg = chord.getBeamGroup();
-
-            if (bg != null) {
-                for (AbstractChordInter c : bg.getChords()) {
-                    if (!extGroup.contains(c)) {
-                        extGroup.add(c);
-                    }
-                }
-            } else {
-                extGroup.add(chord);
-            }
-        }
-
-        Collections.sort(extGroup, Inters.byCenterAbscissa);
-
-        // Check if more than one beam group is present
-        final AbstractChordInter pivot = checkGroups(Arrays.asList(extGroup));
-
-        if (pivot != null) {
-            final int index = extGroup.indexOf(pivot);
-            tuplets.add(generateOneTuplet(extGroup.subList(0, index)));
-            tuplets.add(generateOneTuplet(extGroup.subList(index, extGroup.size())));
-        } else {
-            tuplets.add(generateOneTuplet(extGroup));
-        }
-
-        return tuplets;
     }
 
     //-------------------//
@@ -453,5 +409,16 @@ public class TupletGenerator
                 dim.height);
 
         return tupletBox;
+    }
+
+    //~ Inner Classes ------------------------------------------------------------------------------
+
+    //--------//
+    // Family //
+    //--------//
+    private record Family(Staff staff,
+                          int size,
+                          Rational rawDuration)
+    {
     }
 }
