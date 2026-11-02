@@ -32,6 +32,7 @@ import org.audiveris.omr.sheet.Picture;
 import org.audiveris.omr.sheet.Staff;
 import org.audiveris.omr.sig.inter.Inter;
 import org.audiveris.omr.sig.inter.Inters;
+import org.audiveris.omr.sig.inter.NumberInter;
 import org.audiveris.omr.sig.inter.TimeNumberInter;
 import org.audiveris.omr.sig.inter.TimeWholeInter;
 import org.audiveris.omr.util.VerticalSide;
@@ -40,6 +41,7 @@ import ij.process.Blitter;
 import ij.process.ByteProcessor;
 
 import java.awt.Rectangle;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -152,6 +154,16 @@ public class BasicTimeBuilder
                         staff);
 
                 if (inter != null) {
+                    for (Iterator<Inter> it = basicColumn.timeSet.iterator(); it.hasNext();) {
+                        final Inter other = it.next();
+
+                        if ((other instanceof NumberInter) && (other.getStaff() == staff)
+                                && other.overlaps(inter)) {
+                            other.remove();
+                            it.remove();
+                        }
+                    }
+
                     sig.addVertex(inter);
                     basicColumn.timeSet.add(inter);
                     (inter.getSide() == VerticalSide.TOP ? nums : dens).add(inter);
