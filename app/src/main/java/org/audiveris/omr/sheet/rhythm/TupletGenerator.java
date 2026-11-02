@@ -69,6 +69,8 @@ public class TupletGenerator
 
     private static final int MAX_FAMILIES = 5;
 
+    private static final int MAX_UNBEAMED_SPAN = 3;
+
     //~ Instance fields ----------------------------------------------------------------------------
 
     /** Underlying measure. */
@@ -120,12 +122,14 @@ public class TupletGenerator
                     staff,
                     beamed.stream().filter(x -> x < firstX).max(Integer::compare).orElse(
                             Integer.MIN_VALUE),
-                    firstX);
+                    firstX,
+                    chords);
             final List<AbstractChordInter> after = getUnbeamed(
                     staff,
                     lastX,
                     beamed.stream().filter(x -> x > lastX).min(Integer::compare).orElse(
-                            Integer.MAX_VALUE));
+                            Integer.MAX_VALUE),
+                    chords);
 
             Search:
             for (int added = 0; added <= (before.size() + after.size()); added++) {
@@ -148,6 +152,46 @@ public class TupletGenerator
             }
         }
 
+        for (Staff staff : measure.getPart().getStaves()) {
+            final List<AbstractChordInter> run = new ArrayList<>();
+
+            for (AbstractChordInter chord : measure.getStandardChords().stream().filter(
+                    ch -> ch.getStaff() == staff).sorted(Inters.byCenterAbscissa).collect(
+                            toList())) {
+                if ((chord.getBeamGroup() != null) || taken.contains(chord)) {
+                    spans.addAll(getUnbeamedSpans(run));
+                    run.clear();
+                } else {
+                    if (!run.isEmpty() && !fitsVoice(chord, run)) {
+                        spans.addAll(getUnbeamedSpans(run));
+                        run.clear();
+                    }
+
+                    run.add(chord);
+                }
+            }
+
+            spans.addAll(getUnbeamedSpans(run));
+        }
+
+        return spans;
+    }
+
+    private static List<List<AbstractChordInter>> getUnbeamedSpans (List<AbstractChordInter> run)
+    {
+        final List<List<AbstractChordInter>> spans = new ArrayList<>();
+
+        for (int i = 0; i < run.size(); i++) {
+            for (int j = i + 1; j <= Math.min(run.size(), i + MAX_UNBEAMED_SPAN); j++) {
+                if (isTupletSpan(run.subList(i, j))) {
+                    spans.add(new ArrayList<>(run.subList(i, j)));
+                    i = j - 1;
+
+                    break;
+                }
+            }
+        }
+
         return spans;
     }
 
@@ -164,7 +208,11 @@ public class TupletGenerator
             }
 
             families.computeIfAbsent(
-                    new Family(span.get(0).getStaff(), span.size(), getRawDuration(span)),
+                    new Family(
+                            span.get(0).getStaff(),
+                            span.size(),
+                            getRawDuration(span),
+                            span.stream().anyMatch(ch -> ch.getBeamGroup() != null)),
                     f -> new ArrayList<>()).add(span);
         }
 
@@ -221,12 +269,34 @@ public class TupletGenerator
     //-------------//
     private List<AbstractChordInter> getUnbeamed (Staff staff,
                                                   int left,
-                                                  int right)
+                                                  int right,
+                                                  List<AbstractChordInter> group)
     {
         return measure.getStandardChords().stream().filter(
                 ch -> (ch.getStaff() == staff) && (ch.getBeamGroup() == null)
-                        && (left < ch.getCenter().x) && (ch.getCenter().x < right)).sorted(
-                                Inters.byCenterAbscissa).collect(toList());
+                        && (left < ch.getCenter().x) && (ch.getCenter().x < right)
+                        && fitsVoice(ch, group)).sorted(Inters.byCenterAbscissa).collect(
+                                toList());
+    }
+
+    private static boolean fitsVoice (AbstractChordInter chord,
+                                      List<AbstractChordInter> group)
+    {
+        final int dir = group.stream().mapToInt(AbstractChordInter::getStemDir).filter(
+                d -> d != 0).findFirst().orElse(0);
+
+        if (chord.getStemDir() != 0) {
+            return (dir == 0) || (chord.getStemDir() == dir);
+        }
+
+        if (dir == 0) {
+            return true;
+        }
+
+        final Rectangle box = Entities.getBounds(group);
+        final int y = chord.getCenter().y;
+
+        return (dir < 0) ? (y <= (box.y + box.height)) : (y >= box.y);
     }
 
     //--------------//
@@ -405,7 +475,8 @@ public class TupletGenerator
     //--------//
     private record Family(Staff staff,
                           int size,
-                          Rational rawDuration)
+                          Rational rawDuration,
+                          boolean beamed)
     {
     }
 }

@@ -304,6 +304,15 @@ public class MeasureRhythm
         return measure.getTuplets().stream().filter(t -> t.isImplicit()).collect(toList());
     }
 
+    private int countFilledVoices ()
+    {
+        final Rational expected = measure.getStack().getExpectedDuration();
+
+        return (int) measure.getVoices().stream().filter(
+                voice -> !voice.isMeasureRest() && expected.equals(
+                        voice.getLastChord().getEndTime())).count();
+    }
+
     //--------------//
     // intersection //
     //--------------//
@@ -372,19 +381,34 @@ public class MeasureRhythm
         }
 
         final int voiceCount = measure.getVoices().size();
+        int bestFilled = countFilledVoices();
+        List<List<AbstractChordInter>> best = null;
 
         for (List<List<AbstractChordInter>> hypothesis : tupletGenerator.getHypotheses()) {
             final List<TupletInter> tuplets = hypothesis.stream().map(
                     tupletGenerator::generateOneTuplet).collect(toList());
+            final boolean mapped = mapMeasure();
 
-            if (mapMeasure() && (measure.getVoices().size() <= voiceCount) && fillMeasure(
-                    tuplets)) {
-                logger.debug("{} implicit tuplets {}", measure, tuplets);
+            if ((measure.getVoices().size() <= voiceCount) && fillMeasure(tuplets)) {
+                if (mapped) {
+                    logger.debug("{} implicit tuplets {}", measure, tuplets);
 
-                return true;
+                    return true;
+                }
+
+                final int filled = countFilledVoices();
+
+                if (filled > bestFilled) {
+                    bestFilled = filled;
+                    best = hypothesis;
+                }
             }
 
             removeTuplets(tuplets);
+        }
+
+        if (best != null) {
+            best.forEach(tupletGenerator::generateOneTuplet);
         }
 
         return mapMeasure();
