@@ -1085,7 +1085,7 @@ public class RunTable
         getWeight();
 
         int hash = 3;
-        hash = (83 * hash) + Objects.hashCode(this.orientation);
+        hash = (83 * hash) + this.orientation.ordinal();
         hash = (83 * hash) + this.width;
         hash = (83 * hash) + this.height;
         hash = (83 * hash) + Objects.hashCode(this.weight);

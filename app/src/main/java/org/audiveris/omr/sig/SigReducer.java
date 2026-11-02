@@ -452,11 +452,11 @@ public class SigReducer
     {
         logger.debug("S#{} checkAbnormals", system.getId());
 
-        final Set<Inter> toRemove = sig.vertexSet().stream() //
+        final List<Inter> toRemove = sig.vertexSet().stream() //
                 .filter(inter -> inter.isAbnormal()) //
                 .filter(inter -> !inter.canStayAbnormal()) //
                 .filter(inter -> !inter.isManual()) //
-                .collect(Collectors.toSet());
+                .toList();
         toRemove.forEach(inter -> inter.remove());
 
         return toRemove.size();

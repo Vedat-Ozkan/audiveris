@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
@@ -730,7 +729,7 @@ public class BasicSection
     public int hashCode ()
     {
         int hash = 7;
-        hash = (43 * hash) + Objects.hashCode(this.orientation);
+        hash = (43 * hash) + this.orientation.ordinal();
         hash = (43 * hash) + this.weight;
 
         return hash;
