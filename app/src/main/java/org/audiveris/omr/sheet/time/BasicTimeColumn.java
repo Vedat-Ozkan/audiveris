@@ -59,6 +59,18 @@ public class BasicTimeColumn
         }
     }
 
+    @Override
+    public int retrieveTime ()
+    {
+        final int res = super.retrieveTime();
+
+        if (res == -1) {
+            cleanup();
+        }
+
+        return res;
+    }
+
     //----------------//
     // purgeUnaligned //
     //----------------//
