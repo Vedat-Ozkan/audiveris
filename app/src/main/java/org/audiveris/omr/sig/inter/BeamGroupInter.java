@@ -908,7 +908,8 @@ public class BeamGroupInter
     {
         // Propagate voice to the beamed chords, including the interleaved rests if any
         for (AbstractChordInter chord : getChords()) {
-            if (chord.getMeasure() == voice.getMeasure()) {
+            if ((chord.getMeasure() == voice.getMeasure())
+                    && !(chord instanceof SmallChordInter)) {
                 chord.setVoice(voice);
             }
         }

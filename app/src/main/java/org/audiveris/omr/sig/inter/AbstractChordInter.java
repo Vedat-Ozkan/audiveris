@@ -1441,7 +1441,7 @@ public abstract class AbstractChordInter
 
             for (AbstractChordInter chord : tied) {
                 // Make sure the tied chords belong to the same measure
-                if (this.measure == chord.measure) {
+                if ((this.measure == chord.measure) && !(chord instanceof SmallChordInter)) {
                     chord.setVoice(voice);
                 }
             }
