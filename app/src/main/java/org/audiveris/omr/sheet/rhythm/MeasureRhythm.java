@@ -739,7 +739,8 @@ public class MeasureRhythm
                                 }
                             }
 
-                            logger.info("{} No timeOffset for {}", measure, ch);
+                            ch.setAndPushTime(getTimeAfterStaffPredecessor(ch));
+                            measure.setAbnormal(true);
                         }
                     }
                 }
@@ -782,6 +783,17 @@ public class MeasureRhythm
             }
 
             logger.info("{}", sb);
+        }
+
+        private Rational getTimeAfterStaffPredecessor (AbstractChordInter rookie)
+        {
+            return slots.subList(0, slots.indexOf(slot)).stream()
+                    .flatMap(s -> s.getChords().stream())
+                    .filter(ch -> (ch.getTopStaff() == rookie.getTopStaff())
+                            && (ch.getTimeOffset() != null))
+                    .max(Inters.byCenterAbscissa)
+                    .map(AbstractChordInter::getEndTime)
+                    .orElse(Rational.ZERO);
         }
 
         //--------------------//
