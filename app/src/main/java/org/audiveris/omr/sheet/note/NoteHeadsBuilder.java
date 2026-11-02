@@ -674,7 +674,8 @@ public class NoteHeadsBuilder
      * <p>
      * So, around each head candidate, the clef-sized ink is classified as a whole. If it is a
      * treble clef, the clef is created right away and the head candidates it contains are removed,
-     * unless one of them is a good head: a stemmed chord can look like a clef.
+     * unless one of them is a good head of standard size: a stemmed chord can look like a clef,
+     * while the ball of a treble clef matches a small black head.
      *
      * @param staff the staff being processed
      * @param heads (input/output) the head candidates of this staff
@@ -730,7 +731,10 @@ public class NoteHeadsBuilder
                 if (!common.isEmpty() && ((2 * common.width * common.height) >= (hb.width
                         * hb.height))) {
                     inside.add(h);
-                    bestGrade = Math.max(bestGrade, h.getGrade());
+
+                    if (!h.getShape().isSmallHead()) {
+                        bestGrade = Math.max(bestGrade, h.getGrade());
+                    }
                 }
             }
 
