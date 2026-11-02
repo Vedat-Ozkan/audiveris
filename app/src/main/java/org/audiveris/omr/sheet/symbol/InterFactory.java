@@ -39,7 +39,6 @@ import org.audiveris.omr.sig.SIGraph;
 import org.audiveris.omr.sig.inter.AbstractChordInter;
 import org.audiveris.omr.sig.inter.AbstractFlagInter;
 import org.audiveris.omr.sig.inter.AbstractPauseInter;
-import org.audiveris.omr.sig.inter.AbstractTimeInter;
 import org.audiveris.omr.sig.inter.AlterInter;
 import org.audiveris.omr.sig.inter.ArpeggiatoInter;
 import org.audiveris.omr.sig.inter.ArticulationInter;
@@ -66,7 +65,6 @@ import org.audiveris.omr.sig.inter.GraceChordInter;
 import org.audiveris.omr.sig.inter.HeadChordInter;
 import org.audiveris.omr.sig.inter.HeadInter;
 import org.audiveris.omr.sig.inter.Inter;
-import org.audiveris.omr.sig.inter.InterEnsemble;
 import org.audiveris.omr.sig.inter.Inters;
 import org.audiveris.omr.sig.inter.KeyInter;
 import org.audiveris.omr.sig.inter.LedgerInter;
@@ -100,11 +98,8 @@ import org.audiveris.omr.util.Navigable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.Rectangle;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -694,7 +689,11 @@ public class InterFactory
         final List<Inter> systemTimes = sig.inters(
                 new Class[] { TimeWholeInter.class, // Whole symbol like C or predefined 6/8
                         TimeCustomInter.class, // User modifiable combo 6/8
-                        TimeNumberInter.class }); // Partial symbol like 6 or 8
+                        TimeNumberInter.class, // Partial symbol like 6 or 8
+                        NumberInter.class });
+        systemTimes.removeIf(
+                inter -> (inter instanceof NumberInter) && !TimeNumberInter.isPitchValid(
+                        inter.getStaff().pitchPositionOf(inter.getCenter())));
 
         final List<Inter> headerTimes = new ArrayList<>();
 
@@ -735,34 +734,7 @@ public class InterFactory
         for (Entry<MeasureStack, Set<Inter>> entry : timeMap.entrySet()) {
             final MeasureStack stack = entry.getKey();
             final TimeColumn column = new BasicTimeColumn(stack, entry.getValue());
-            final int res = column.retrieveTime();
-
-            // If the stack does have a validated time sig, discard overlapping stuff right now!
-            if (res != -1) {
-                final Collection<AbstractTimeInter> times = column.getTimeInters().values();
-                final Rectangle columnBox = Inters.getBounds(times);
-                final List<Inter> neighbors = sig.inters(
-                        (inter) -> inter.getBounds().intersects(columnBox)
-                                && !(inter instanceof InterEnsemble));
-
-                neighbors.removeAll(times);
-
-                for (AbstractTimeInter time : times) {
-                    final double timeGrade = time.getGrade();
-
-                    for (Iterator<Inter> it = neighbors.iterator(); it.hasNext();) {
-                        final Inter neighbor = it.next();
-
-                        if (neighbor.overlaps(time) && (neighbor.getGrade() < timeGrade)) {
-                            if (neighbor.isVip()) {
-                                logger.info("VIP Deleting time overlapping {}", neighbor);
-                            }
-                            neighbor.remove();
-                            it.remove();
-                        }
-                    }
-                }
-            }
+            column.retrieveTime();
         }
     }
 
