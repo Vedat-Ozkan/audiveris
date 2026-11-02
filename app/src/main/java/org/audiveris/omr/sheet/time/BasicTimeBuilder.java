@@ -132,7 +132,7 @@ public class BasicTimeBuilder
             return;
         }
 
-        final Glyph glyph = system.registerGlyph(GlyphFactory.buildGlyph(parts), null);
+        final Glyph glyph = GlyphFactory.buildGlyph(parts);
 
         if (glyph.getWeight() < params.minHalfTimeWeight) {
             return;
@@ -154,6 +154,8 @@ public class BasicTimeBuilder
                         staff);
 
                 if (inter != null) {
+                    inter.setGlyph(system.registerGlyph(glyph, null));
+
                     for (Iterator<Inter> it = basicColumn.timeSet.iterator(); it.hasNext();) {
                         final Inter other = it.next();
 
@@ -161,6 +163,8 @@ public class BasicTimeBuilder
                                 && other.overlaps(inter)) {
                             other.remove();
                             it.remove();
+                            nums.remove(other);
+                            dens.remove(other);
                         }
                     }
 
