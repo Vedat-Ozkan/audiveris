@@ -1257,7 +1257,8 @@ public class BarsRetriever
                         int xLeft = staff.getAbscissa(LEFT); // Based on long line chunks only
 
                         // Check column is not too far right into staff
-                        if ((peak.getStart() - xLeft) > params.maxLinesLeftToStartBar) {
+                        if (((peak.getStart() - xLeft) > params.maxLinesLeftToStartBar)
+                                && !projectorOf(staff).hasLineFreeBlank(xLeft, peak.getStart())) {
                             if (peak.isVip() || logger.isDebugEnabled()) {
                                 logger.info(
                                         "start {} too far inside staff#{}",

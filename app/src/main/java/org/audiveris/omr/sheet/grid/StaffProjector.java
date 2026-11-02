@@ -1081,6 +1081,18 @@ public class StaffProjector
         return (blank != null) && (blank.start <= stop);
     }
 
+    public boolean hasLineFreeBlank (int start,
+                                     int stop)
+    {
+        if (stop <= start) {
+            return false;
+        }
+
+        Blank blank = selectBlank(LEFT, stop, params.minLineFreeBlankWidth);
+
+        return (blank != null) && (blank.start >= start);
+    }
+
     //------------//
     // insertPeak //
     //------------//
@@ -1699,6 +1711,10 @@ public class StaffProjector
                 1.0,
                 "Minimum width for a standard blank region (left of lines)");
 
+        private final Scale.Fraction minLineFreeBlankWidth = new Scale.Fraction(
+                0.5,
+                "Minimum width for a line-free blank region (left of start bar)");
+
         private final Scale.Fraction minWideBlankWidth = new Scale.Fraction(
                 2.0,
                 "Minimum width for a wide blank region (to limit peaks search)");
@@ -1743,6 +1759,8 @@ public class StaffProjector
 
         final int minStandardBlankWidth;
 
+        final int minLineFreeBlankWidth;
+
         final int minWideBlankWidth;
 
         final int maxBarWidth;
@@ -1782,6 +1800,7 @@ public class StaffProjector
                 barRefineDx = large.toPixels(constants.barRefineDx);
                 minSmallBlankWidth = large.toPixels(constants.minSmallBlankWidth);
                 minStandardBlankWidth = large.toPixels(constants.minStandardBlankWidth);
+                minLineFreeBlankWidth = large.toPixels(constants.minLineFreeBlankWidth);
                 minWideBlankWidth = large.toPixels(constants.minWideBlankWidth);
                 maxBarWidth = large.toPixels(constants.maxBarWidth);
                 maxLeftExtremum = large.toPixels(constants.maxLeftExtremum);
