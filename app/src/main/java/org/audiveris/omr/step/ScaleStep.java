@@ -23,6 +23,8 @@ package org.audiveris.omr.step;
 
 import org.audiveris.omr.constant.Constant;
 import org.audiveris.omr.constant.ConstantSet;
+import org.audiveris.omr.run.RunTable;
+import org.audiveris.omr.sheet.Picture;
 import org.audiveris.omr.sheet.Scale;
 import org.audiveris.omr.sheet.ScaleBuilder;
 import org.audiveris.omr.sheet.Sheet;
@@ -68,28 +70,55 @@ public class ScaleStep
         throws StepException
     {
         Scale scale = new ScaleBuilder(sheet).retrieveScale();
-        final int interline = scale.getInterline();
 
-        if (interline < constants.minInterline.getValue()) {
-            final double zoom = Math.min(
-                    constants.targetInterline.getValue() / (double) interline,
-                    LoadStep.maxZoom(sheet));
-            final BufferedImage image = zoom > 1 ? sheet.getStub().loadVectorImage(zoom) : null;
-
-            if (image != null) {
-                logger.info(
-                        "Interline {} too small, image rendered again {}x{}",
-                        interline,
-                        image.getWidth(),
-                        image.getHeight());
-                sheet.setImage(image, true);
-                new BinaryStep().doit(sheet);
-                scale = new ScaleBuilder(sheet).retrieveScale();
-            }
+        if (scale.getInterline() < constants.minInterline.getValue()) {
+            scale = renderAgain(sheet, scale);
         }
 
         logger.info("{}", scale);
         sheet.setScale(scale);
+    }
+
+    private static Scale renderAgain (Sheet sheet,
+                                      Scale scale)
+        throws StepException
+    {
+        final int interline = scale.getInterline();
+        final double zoom = Math.min(
+                constants.targetInterline.getValue() / (double) interline,
+                LoadStep.maxZoom(sheet));
+        final BufferedImage image = zoom > 1 ? sheet.getStub().loadVectorImage(zoom) : null;
+
+        if (image == null) {
+            return scale;
+        }
+
+        final RunTable binary = sheet.getPicture().getVerticalTable(Picture.TableKey.BINARY);
+        logger.info(
+                "Interline {} too small, image rendered again {}x{}",
+                interline,
+                image.getWidth(),
+                image.getHeight());
+        sheet.setImage(image, true);
+        new BinaryStep().doit(sheet);
+
+        try {
+            final Scale finer = new ScaleBuilder(sheet, false).retrieveScale();
+
+            if (finer.getInterline() > interline) {
+                return finer;
+            }
+
+            logger.info(
+                    "Interline {} found again is not larger, original image kept",
+                    finer.getInterline());
+        } catch (StepException ex) {
+            logger.info("No scale found again ({}), original image kept", ex.getMessage());
+        }
+
+        sheet.getPicture().setTable(Picture.TableKey.BINARY, binary, true);
+
+        return scale;
     }
 
     //-------------//

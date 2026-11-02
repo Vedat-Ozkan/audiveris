@@ -143,6 +143,8 @@ public class ScaleBuilder
     /** User-specified interline value, if any. */
     private Integer interlineKey;
 
+    private final boolean invalidateOnFailure;
+
     //~ Constructors -------------------------------------------------------------------------------
 
     /**
@@ -152,7 +154,14 @@ public class ScaleBuilder
      */
     public ScaleBuilder (Sheet sheet)
     {
+        this(sheet, true);
+    }
+
+    public ScaleBuilder (Sheet sheet,
+                         boolean invalidateOnFailure)
+    {
         this.sheet = sheet;
+        this.invalidateOnFailure = invalidateOnFailure;
     }
 
     //~ Methods ------------------------------------------------------------------------------------
@@ -184,7 +193,7 @@ public class ScaleBuilder
                             + " This interline value is NOT RELIABLE!",
                     sheet.getId(),
                     interline);
-            sheet.getStub().decideOnRemoval(msg, false);
+            reject(msg);
         } else if (interline > constants.maxInterline.getValue()) {
             final String msg = String.format(
                     "%s\n\n With a too high interline value of %d pixels,\n"
@@ -192,7 +201,7 @@ public class ScaleBuilder
                             + " This interline value is NOT RELIABLE!",
                     sheet.getId(),
                     interline);
-            sheet.getStub().decideOnRemoval(msg, false);
+            reject(msg);
         }
     }
 
@@ -445,6 +454,26 @@ public class ScaleBuilder
         return doRetrieveScale(false);
     }
 
+    private void reject (String msg)
+        throws StepException
+    {
+        if (!invalidateOnFailure) {
+            throw new StepException(msg);
+        }
+
+        sheet.getStub().decideOnRemoval(msg, false);
+    }
+
+    private void fail (String msg)
+        throws StepException
+    {
+        if (invalidateOnFailure) {
+            sheet.getStub().invalidate();
+        }
+
+        throw new StepException(msg);
+    }
+
     //~ Static Methods -----------------------------------------------------------------------------
 
     //-----------------//
@@ -669,12 +698,12 @@ public class ScaleBuilder
             logger.debug("blackRatio: {}", blackRatio);
 
             if (blackRatio < constants.minBlackRatio.getValue()) {
-                sheet.getStub().decideOnRemoval("""
+                reject("""
                         %s
 
                         Too few black pixels: %.2f%% of whole image.
                         This sheet is almost blank.
-                        """.formatted(sheet.getId(), 100 * blackRatio), false);
+                        """.formatted(sheet.getId(), 100 * blackRatio));
             }
         }
 
@@ -742,8 +771,7 @@ public class ScaleBuilder
             }
 
             if (comboPeaks.isEmpty()) {
-                sheet.getStub().invalidate();
-                throw new StepException("No regularly spaced lines found");
+                fail("No regularly spaced lines found");
             }
 
             // Primary combo peak
@@ -816,8 +844,7 @@ public class ScaleBuilder
                     constants.minGainRatio.getValue());
 
             if (blackPeaks.isEmpty()) {
-                sheet.getStub().invalidate();
-                throw new StepException("No significant black lines found");
+                fail("No significant black lines found");
             }
 
             // Check for two significant black peaks
