@@ -57,13 +57,7 @@ import java.util.TreeMap;
 import static java.util.stream.Collectors.toList;
 
 /**
- * Class <code>TupletGenerator</code> proposes implicit tuplet signs for a measure whose
- * rhythm is not consistent.
- * <p>
- * A tuplet span is a beam group, extended by the fewest unbeamed chords (rests or flagged notes)
- * just before or after it on its staff, whose raw duration is 3/2 of a plain note value.
- * Spans with the same staff, chord count and raw duration form a family, and each hypothesis
- * is a union of families, so that similar groups are all tuplets or all plain.
+ * Class <code>TupletGenerator</code> proposes implicit tuplet signs for a measure.
  *
  * @author Hervé Bitteur
  */
@@ -104,11 +98,6 @@ public class TupletGenerator
     //----------//
     // getSpans //
     //----------//
-    /**
-     * Report the tuplet spans of the measure.
-     *
-     * @return the tuplet spans, each one as a sequence of chords
-     */
     private List<List<AbstractChordInter>> getSpans ()
     {
         final List<List<AbstractChordInter>> spans = new ArrayList<>();
@@ -166,11 +155,6 @@ public class TupletGenerator
     //---------------//
     // getHypotheses //
     //---------------//
-    /**
-     * Report the tuplet hypotheses for the measure, the smallest first.
-     *
-     * @return the sequence of hypotheses, each one as a list of tuplet spans
-     */
     public List<List<List<AbstractChordInter>>> getHypotheses ()
     {
         final Map<Family, List<List<AbstractChordInter>>> families = new LinkedHashMap<>();

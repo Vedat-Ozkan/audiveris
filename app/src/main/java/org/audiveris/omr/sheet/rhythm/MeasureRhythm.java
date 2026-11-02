@@ -276,12 +276,6 @@ public class MeasureRhythm
     //-------------//
     // fillMeasure //
     //-------------//
-    /**
-     * Report whether every voice involved in the provided tuplets ends at the measure end.
-     *
-     * @param tuplets the provided tuplets
-     * @return true if so
-     */
     private boolean fillMeasure (List<TupletInter> tuplets)
     {
         final Rational expected = measure.getStack().getExpectedDuration();
@@ -361,11 +355,6 @@ public class MeasureRhythm
     //---------//
     /**
      * Process the measure to retrieve voices and time offsets.
-     * <p>
-     * If the measure rhythm is not consistent and implicit tuplets are allowed, the tuplet
-     * hypotheses proposed by the {@link TupletGenerator} are tried in turn, and the first one
-     * that makes the measure consistent without adding voices, with every voice it shrinks ending
-     * at the measure end, is kept.
      *
      * @return true if OK
      */
@@ -404,11 +393,6 @@ public class MeasureRhythm
     //------------//
     // mapMeasure //
     //------------//
-    /**
-     * Map the measure chords to voices and time offsets, using the current tuplets.
-     *
-     * @return true if OK
-     */
     private boolean mapMeasure ()
     {
         measure.resetRhythm();
@@ -607,11 +591,6 @@ public class MeasureRhythm
         //------------------//
         // rejectLaterTimes //
         //------------------//
-        /**
-         * Reject the mappings that led to a time value later than the lowest one in a slot.
-         *
-         * @param times the map of detected times
-         */
         private void rejectLaterTimes (TreeMap<Rational, List<AbstractChordInter>> times)
         {
             if (mapping == null) {
