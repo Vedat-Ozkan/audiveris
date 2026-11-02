@@ -381,9 +381,7 @@ public class TupletGenerator
         }
 
         // Simplistic approach
-        final int size = group.size();
-        final int nb = (int) Math.rint(size / 3.0);
-        final Shape shape = (nb == 1) ? Shape.TUPLET_THREE : Shape.TUPLET_SIX;
+        final Shape shape = (group.size() < 6) ? Shape.TUPLET_THREE : Shape.TUPLET_SIX;
 
         final TupletInter tuplet = new TupletInter(null, shape, 1.0);
         tuplet.setImplicit(true);
