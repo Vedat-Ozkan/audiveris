@@ -36,7 +36,9 @@ import org.apache.pdfbox.io.RandomAccessReadBufferedFile;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 
@@ -45,8 +47,11 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 import javax.imageio.ImageIO;
@@ -360,39 +365,46 @@ public abstract class ImageLoading
         {
             checkId(id);
 
-            if (!paints(doc.getPage(id - 1), new HashSet<>())) {
+            final Set<String> operators = new HashSet<>();
+            final List<PDXObject> drawn = new ArrayList<>();
+            collectDrawing(doc.getPage(id - 1), operators, drawn, new HashSet<>());
+
+            if (Collections.disjoint(operators, PAINT_OPERATORS) || operators.contains("BI")
+                    || drawn.stream().anyMatch(PDImageXObject.class::isInstance)) {
                 return null;
             }
 
             return render(id - 1, (float) (constants.pdfResolution.getValue() * zoom));
         }
 
-        private static boolean paints (PDContentStream content,
-                                       Set<COSBase> seen)
+        private static void collectDrawing (PDContentStream content,
+                                            Set<String> operators,
+                                            List<PDXObject> drawn,
+                                            Set<COSBase> seen)
             throws IOException
         {
             final PDFStreamParser parser = new PDFStreamParser(content);
+            final PDResources resources = content.getResources();
+            COSName name = null;
 
             for (Object token = parser.parseNextToken(); token != null;
                     token = parser.parseNextToken()) {
-                if (token instanceof Operator operator && PAINT_OPERATORS.contains(
-                        operator.getName())) {
-                    return true;
-                }
-            }
+                if (token instanceof COSName cosName) {
+                    name = cosName;
+                } else if (token instanceof Operator operator) {
+                    operators.add(operator.getName());
 
-            final PDResources resources = content.getResources();
+                    if (operator.getName().equals("Do") && (resources != null) && (name != null)) {
+                        final PDXObject xObject = resources.getXObject(name);
+                        drawn.add(xObject);
 
-            if (resources != null) {
-                for (COSName name : resources.getXObjectNames()) {
-                    if (resources.getXObject(name) instanceof PDFormXObject form && seen.add(
-                            form.getCOSObject()) && paints(form, seen)) {
-                        return true;
+                        if (xObject instanceof PDFormXObject form && seen.add(
+                                form.getCOSObject())) {
+                            collectDrawing(form, operators, drawn, seen);
+                        }
                     }
                 }
             }
-
-            return false;
         }
 
         private BufferedImage render (int pageIndex,
