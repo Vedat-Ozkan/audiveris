@@ -323,6 +323,11 @@ public class GeometricMoments
         return k[7];
     }
 
+    public double getN03 ()
+    {
+        return k[9];
+    }
+
     //-----------//
     // getValues //
     //-----------//

@@ -249,9 +249,50 @@ public abstract class AbstractClassifier<M extends Object, N extends Object>
             return noiseEvaluations;
         } else {
             Evaluation[] evals = getNaturalEvaluations(glyph, interline);
+            orientSixOrNine(glyph, interline, evals);
             Arrays.sort(evals, Evaluation.byReverseGrade); // Order the evals from best to worst
 
             return evals;
+        }
+    }
+
+    private void orientSixOrNine (Glyph glyph,
+                                  int interline,
+                                  Evaluation[] evals)
+    {
+        Evaluation best = null;
+        Evaluation six = null;
+        Evaluation nine = null;
+
+        for (Evaluation eval : evals) {
+            if ((best == null) || (eval.grade > best.grade)) {
+                best = eval;
+            }
+
+            if (eval.shape == Shape.TIME_SIX) {
+                six = eval;
+            } else if (eval.shape == Shape.TIME_NINE) {
+                nine = eval;
+            }
+        }
+
+        if ((six == null) || (nine == null) || ((best != six) && (best != nine))) {
+            return;
+        }
+
+        final double n03 = glyph.getGeometricMoments(interline).getN03();
+
+        if (Math.abs(n03) < constants.minSixNineSkew.getValue()) {
+            return;
+        }
+
+        final Evaluation upright = (n03 > 0) ? nine : six;
+        final Evaluation inverted = (upright == six) ? nine : six;
+
+        if (upright.grade < inverted.grade) {
+            final double grade = upright.grade;
+            upright.grade = inverted.grade;
+            inverted.grade = grade;
         }
     }
 
@@ -412,6 +453,11 @@ public abstract class AbstractClassifier<M extends Object, N extends Object>
         private final Scale.AreaFraction minWeight = new Scale.AreaFraction(
                 0.04,
                 "Minimum normalized weight to be considered not a noise");
+
+        private final Constant.Double minSixNineSkew = new Constant.Double(
+                "moment",
+                0.001,
+                "Minimum absolute n03 moment to tell a 6 from a 9");
     }
 
     //---------//
