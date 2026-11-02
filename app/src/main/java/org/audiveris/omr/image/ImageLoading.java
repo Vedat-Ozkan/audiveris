@@ -28,8 +28,15 @@ import org.audiveris.omr.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.pdfbox.contentstream.PDContentStream;
+import org.apache.pdfbox.contentstream.operator.Operator;
+import org.apache.pdfbox.cos.COSBase;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.io.RandomAccessReadBufferedFile;
+import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 
@@ -38,7 +45,9 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -305,6 +314,17 @@ public abstract class ImageLoading
     private static class PdfboxLoader
             extends AbstractLoader
     {
+        private static final Set<String> PAINT_OPERATORS = Set.of(
+                "S",
+                "s",
+                "f",
+                "F",
+                "f*",
+                "B",
+                "B*",
+                "b",
+                "b*");
+
         private final PDDocument doc;
 
         PdfboxLoader (PDDocument doc,
@@ -329,8 +349,56 @@ public abstract class ImageLoading
             throws IOException
         {
             checkId(id);
-            final int pageIndex = id - 1;
 
+            return render(id - 1, constants.pdfResolution.getValue());
+        }
+
+        @Override
+        public BufferedImage getVectorImage (int id,
+                                             double zoom)
+            throws IOException
+        {
+            checkId(id);
+
+            if (!paints(doc.getPage(id - 1), new HashSet<>())) {
+                return null;
+            }
+
+            return render(id - 1, (float) (constants.pdfResolution.getValue() * zoom));
+        }
+
+        private static boolean paints (PDContentStream content,
+                                       Set<COSBase> seen)
+            throws IOException
+        {
+            final PDFStreamParser parser = new PDFStreamParser(content);
+
+            for (Object token = parser.parseNextToken(); token != null;
+                    token = parser.parseNextToken()) {
+                if (token instanceof Operator operator && PAINT_OPERATORS.contains(
+                        operator.getName())) {
+                    return true;
+                }
+            }
+
+            final PDResources resources = content.getResources();
+
+            if (resources != null) {
+                for (COSName name : resources.getXObjectNames()) {
+                    if (resources.getXObject(name) instanceof PDFormXObject form && seen.add(
+                            form.getCOSObject()) && paints(form, seen)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private BufferedImage render (int pageIndex,
+                                      float dpi)
+            throws IOException
+        {
             RenderingHints renderingHints = new RenderingHints(null);
             renderingHints.put(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
             renderingHints.put(
@@ -339,10 +407,7 @@ public abstract class ImageLoading
 
             PDFRenderer renderer = new PDFRenderer(doc);
             renderer.setRenderingHints(renderingHints);
-            return renderer.renderImageWithDPI(
-                    pageIndex,
-                    constants.pdfResolution.getValue(),
-                    ImageType.GRAY);
+            return renderer.renderImageWithDPI(pageIndex, dpi, ImageType.GRAY);
         }
     }
 
@@ -370,6 +435,13 @@ public abstract class ImageLoading
          */
         BufferedImage getImage (int id)
             throws IOException;
+
+        default BufferedImage getVectorImage (int id,
+                                              double zoom)
+            throws IOException
+        {
+            return null;
+        }
 
         /**
          * Report the count of images available in input file.

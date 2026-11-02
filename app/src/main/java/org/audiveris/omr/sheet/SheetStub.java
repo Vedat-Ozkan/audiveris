@@ -1292,6 +1292,26 @@ public class SheetStub
         }
     }
 
+    public synchronized BufferedImage loadVectorImage (double zoom)
+    {
+        final SheetInput si = getSheetInput();
+        final ImageLoading.Loader loader = ImageLoading.getLoader(si.path);
+
+        if (loader == null) {
+            return null;
+        }
+
+        try {
+            return loader.getVectorImage(si.number, zoom);
+        } catch (IOException ex) {
+            logger.warn("Error loading image " + si.path, ex);
+
+            return null;
+        } finally {
+            loader.dispose();
+        }
+    }
+
     //------------------//
     // migrateOldParams //
     //------------------//

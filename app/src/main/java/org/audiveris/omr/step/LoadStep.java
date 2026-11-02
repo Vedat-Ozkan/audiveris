@@ -88,6 +88,17 @@ public class LoadStep
         }
     }
 
+    static double maxZoom (Sheet sheet)
+    {
+        final int max = constants.maxPixelCount.getValue();
+
+        if (max <= 0) {
+            return Double.POSITIVE_INFINITY;
+        }
+
+        return Math.sqrt(max / ((double) sheet.getWidth() * sheet.getHeight()));
+    }
+
     //-------------//
     // getSheetTab //
     //-------------//

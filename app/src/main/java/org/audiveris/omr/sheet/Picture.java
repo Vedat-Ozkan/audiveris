@@ -984,6 +984,7 @@ public class Picture
 
             // Discard all sources and tables
             images.clear();
+            sources.clear();
             tables.clear();
 
             // Use the new dimension

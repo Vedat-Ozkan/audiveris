@@ -21,6 +21,8 @@
 // </editor-fold>
 package org.audiveris.omr.step;
 
+import org.audiveris.omr.constant.Constant;
+import org.audiveris.omr.constant.ConstantSet;
 import org.audiveris.omr.sheet.Scale;
 import org.audiveris.omr.sheet.ScaleBuilder;
 import org.audiveris.omr.sheet.Sheet;
@@ -28,6 +30,8 @@ import org.audiveris.omr.sheet.ui.SheetTab;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.awt.image.BufferedImage;
 
 /**
  * Class <code>ScaleStep</code> implements <b>SCALE</b> step, which determines the
@@ -40,6 +44,8 @@ public class ScaleStep
         extends AbstractStep
 {
     //~ Static fields/initializers -----------------------------------------------------------------
+
+    private static final Constants constants = new Constants();
 
     private static final Logger logger = LoggerFactory.getLogger(ScaleStep.class);
 
@@ -61,7 +67,27 @@ public class ScaleStep
     public void doit (Sheet sheet)
         throws StepException
     {
-        final Scale scale = new ScaleBuilder(sheet).retrieveScale();
+        Scale scale = new ScaleBuilder(sheet).retrieveScale();
+        final int interline = scale.getInterline();
+
+        if (interline < constants.minInterline.getValue()) {
+            final double zoom = Math.min(
+                    constants.targetInterline.getValue() / (double) interline,
+                    LoadStep.maxZoom(sheet));
+            final BufferedImage image = zoom > 1 ? sheet.getStub().loadVectorImage(zoom) : null;
+
+            if (image != null) {
+                logger.info(
+                        "Interline {} too small, image rendered again {}x{}",
+                        interline,
+                        image.getWidth(),
+                        image.getHeight());
+                sheet.setImage(image, true);
+                new BinaryStep().doit(sheet);
+                scale = new ScaleBuilder(sheet).retrieveScale();
+            }
+        }
+
         logger.info("{}", scale);
         sheet.setScale(scale);
     }
@@ -73,5 +99,19 @@ public class ScaleStep
     public SheetTab getSheetTab ()
     {
         return SheetTab.BINARY_TAB;
+    }
+
+    private static class Constants
+            extends ConstantSet
+    {
+        private final Constant.Integer minInterline = new Constant.Integer(
+                "Pixels",
+                18,
+                "Vector page interline below which the page is rendered again at a higher resolution");
+
+        private final Constant.Integer targetInterline = new Constant.Integer(
+                "Pixels",
+                20,
+                "Interline aimed at when a vector page is rendered again");
     }
 }
