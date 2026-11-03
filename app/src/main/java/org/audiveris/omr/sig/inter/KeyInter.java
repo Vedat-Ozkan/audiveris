@@ -1198,7 +1198,7 @@ public class KeyInter
             // Special case for Natural (cancel key): we use fifths/pitches of the effective key
             cancelFifths = getNaturalFifths(firstAlter);
 
-            if (cancelFifths == null) {
+            if ((cancelFifths == null) || (cancelFifths == 0)) {
                 logger.info("No effective key before {}", firstAlter);
                 return null;
             }
