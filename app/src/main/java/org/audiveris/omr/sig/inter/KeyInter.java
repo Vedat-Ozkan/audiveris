@@ -1255,6 +1255,17 @@ public class KeyInter
         // In the case of an isolated alter, we check for lack of head nearby,
         // because the isolated alter might just be an accidental
         if (nb == 1) {
+            final Rectangle alterBox = firstAlter.getBounds();
+            for (Inter other : system.getSig().inters(HeadInter.class)) {
+                final Rectangle headBox = other.getBounds();
+                if (other.getStaff() == staff && headBox.x >= alterBox.x
+                        && headBox.y < alterBox.y + alterBox.height && headBox.y + headBox.height > alterBox.y
+                        && GeoUtil.xGap(alterBox, headBox) < minXGapToHead) {
+                    logger.debug("Head too close to isolated {}", firstAlter.getId());
+                    return null;
+                }
+            }
+
             final HeadInter head = firstAlter.getAlteredHead();
             if (head != null) {
                 // Check horizontal gap to chord bounds
