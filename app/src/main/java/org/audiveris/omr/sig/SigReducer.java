@@ -1398,6 +1398,15 @@ public class SigReducer
                     continue;
                 }
 
+                final OctaveShiftInter letter = octaveInsideWord(left, right);
+
+                if (letter != null) {
+                    letter.decrease(0.5);
+                    excludeOverlap(left, right);
+
+                    continue;
+                }
+
                 // Overlap is accepted in some cases
                 if (compatible(left, right) || compatible(right, left)) {
                     continue;
@@ -1439,6 +1448,30 @@ public class SigReducer
                 }
             }
         }
+    }
+
+    private static OctaveShiftInter octaveInsideWord (Inter one,
+                                                      Inter two)
+    {
+        if (one instanceof OctaveShiftInter os && two instanceof WordInter word) {
+            return isLetterOf(os, word) ? os : null;
+        }
+
+        if (two instanceof OctaveShiftInter os && one instanceof WordInter word) {
+            return isLetterOf(os, word) ? os : null;
+        }
+
+        return null;
+    }
+
+    private static boolean isLetterOf (OctaveShiftInter os,
+                                       WordInter word)
+    {
+        final String value = word.getValue();
+
+        return word.getBounds().contains(os.getBounds().getCenterX(), os.getBounds().getCenterY())
+                && value.chars().anyMatch(Character::isLetter)
+                && value.chars().noneMatch(Character::isDigit);
     }
 
     //---------//
