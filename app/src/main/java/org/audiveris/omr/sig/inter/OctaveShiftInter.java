@@ -1094,13 +1094,25 @@ public class OctaveShiftInter
         }
 
         final int maxGap = scale.toPixels(constants.maxDashGap);
+        final int reach = scale.getMaxFore() + 1;
         int lastInk = start;
+        int row = bestRow;
 
         for (int x = start; x <= staffRight && x - lastInk <= maxGap; x++) {
-            for (int y = bestRow - 1; y <= bestRow + 1; y++) {
+            int thinRow = -1;
+
+            for (int y = row - 1; y <= row + 1; y++) {
                 if (binary.get(x, y) == PixelSource.FOREGROUND) {
                     lastInk = x;
+
+                    if ((thinRow == -1) && isThinInk(binary, x, y, reach)) {
+                        thinRow = y;
+                    }
                 }
+            }
+
+            if (thinRow != -1) {
+                row = thinRow;
             }
         }
 
