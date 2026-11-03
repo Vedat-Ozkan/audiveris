@@ -893,25 +893,29 @@ public class OctaveShiftInter
                                 double grade,
                                 Staff closestStaff)
     {
-        // TODO: Search a more suitable staff than just the vertically closest one
-        final Staff staff = closestStaff;
-        //
         // Item cannot be located within staff height
         final Point center = glyph.getCenter();
 
-        if (staff.distanceTo(center) <= 0) {
+        if (closestStaff.distanceTo(center) <= 0) {
             return null;
         }
 
         final OctaveShiftInter os = new OctaveShiftInter(glyph, shape, null, grade);
-        final Sheet sheet = staff.getSystem().getSheet();
+        final SystemInfo system = closestStaff.getSystem();
+        final Sheet sheet = system.getSheet();
         final Scale scale = sheet.getScale();
         final int lineLg = scale.toPixels(DEFAULT_LINE_LENGTH);
         final int dashedEnd = dashedLineEnd(
                 sheet.getPicture().getSource(Picture.SourceKey.BINARY),
                 glyph.getBounds(),
-                staff.getAbscissa(RIGHT),
+                closestStaff.getAbscissa(RIGHT),
                 scale);
+        final Staff staff = staffWithNotesNearest(
+                system.getStavesAround(center),
+                center.x,
+                Math.max(center.x + lineLg, dashedEnd),
+                center.y,
+                closestStaff);
         os.line = new Line2D.Double(
                 center,
                 new Point(Math.max(center.x + lineLg, dashedEnd), center.y));
@@ -919,6 +923,37 @@ public class OctaveShiftInter
         os.setStaff(staff);
 
         return os;
+    }
+
+    //-----------------------//
+    // staffWithNotesNearest //
+    //-----------------------//
+    private static Staff staffWithNotesNearest (List<Staff> staves,
+                                                int x1,
+                                                int x2,
+                                                int y,
+                                                Staff fallback)
+    {
+        Staff best = fallback;
+        double bestDistance = Double.MAX_VALUE;
+
+        for (Staff staff : staves) {
+            for (AbstractChordInter chord : staff.getChords()) {
+                final Rectangle box = chord.getBounds();
+                final int x = chord.getCenter().x;
+
+                if (x >= x1 && x <= x2) {
+                    final double distance = Math.min(Math.abs(box.y - y), Math.abs(box.y + box.height - y));
+
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = staff;
+                    }
+                }
+            }
+        }
+
+        return best;
     }
 
     //---------------//
