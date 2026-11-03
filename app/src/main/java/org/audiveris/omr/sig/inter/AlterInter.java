@@ -313,7 +313,13 @@ public class AlterInter
             Inter bestHead = null;
             double bestYGap = Double.MAX_VALUE;
 
+            final boolean small = isSmall(scale);
+
             for (Inter head : notes) {
+                if (small && !head.getShape().isSmallHead()) {
+                    continue;
+                }
+
                 // Note ref point is on head left side and y is at head mid height
                 // We are strict on pitch concordance (through yGapMax value)
                 Point notePt = head.getCenterLeft();
@@ -345,6 +351,17 @@ public class AlterInter
         }
 
         return Collections.emptySet();
+    }
+
+    //---------//
+    // isSmall //
+    //---------//
+    private boolean isSmall (Scale scale)
+    {
+        return switch (shape) {
+            case SHARP, FLAT, NATURAL -> getBounds().height < scale.toPixels(constants.smallMaxHeight);
+            default -> false;
+        };
     }
 
     //-------------//
@@ -551,6 +568,10 @@ public class AlterInter
         private final Scale.Fraction flatTypicalHeight = new Scale.Fraction(
                 2.7,
                 "Typical flat height");
+
+        private final Scale.Fraction smallMaxHeight = new Scale.Fraction(
+                2.15,
+                "Maximum height of a sharp, flat or natural drawn at grace or cue size");
 
         private final Constant.Double flatMassPitchOffset = new Constant.Double(
                 "pitch",
