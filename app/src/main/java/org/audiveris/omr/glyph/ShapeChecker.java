@@ -589,6 +589,19 @@ public class ShapeChecker
         //                return glyph.getNormalizedHeight() <= constants.maxTallDynamicsHeight.getValue();
         //            }
         //        };
+        new Checker("DynamicsHeight", Dynamics.getShapes())
+        {
+            @Override
+            public boolean check (SystemInfo system,
+                                  Evaluation eval,
+                                  Glyph glyph)
+            {
+                final Scale scale = system.getSheet().getScale();
+
+                return glyph.getHeight() <= scale.toPixels(constants.maxDynamicsHeight);
+            }
+        };
+
         new Checker("BelowStaff", Pedals)
         {
             @Override
@@ -971,6 +984,10 @@ public class ShapeChecker
         private final Scale.Fraction maxTallDynamicsHeight = new Scale.Fraction(
                 2.5,
                 "Maximum height for tall dynamics (with f)");
+
+        private final Scale.Fraction maxDynamicsHeight = new Scale.Fraction(
+                4.5,
+                "Maximum height for any dynamics");
 
         private final Scale.Fraction maxGapToStaff = new Scale.Fraction(
                 8.0,
