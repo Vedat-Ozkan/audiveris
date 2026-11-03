@@ -1134,16 +1134,20 @@ public class KeyInter
             filterOverlappingAlters(staffAlters);
             logger.debug("staff: {} alters: {}", staff.getId(), Inters.ids(staffAlters));
 
+            Integer keyInForce = null;
+
             for (int i = 0; i < staffAlters.size(); i++) {
                 final KeyConfig keyConfig = checkConfiguration(
                         false,
-                        staffAlters.subList(i, staffAlters.size()));
+                        staffAlters.subList(i, staffAlters.size()),
+                        keyInForce);
 
                 if (keyConfig != null) {
                     final List<AlterInter> members = staffAlters.subList(
                             i,
                             i + Math.abs(keyConfig.fifths));
                     candidates.add(new KeyCandidate(keyConfig, new ArrayList<>(members)));
+                    keyInForce = (keyConfig.shape == Shape.NATURAL) ? 0 : keyConfig.fifths;
                     i += members.size() - 1;
                 }
             }
@@ -1172,6 +1176,13 @@ public class KeyInter
      */
     private static KeyConfig checkConfiguration (boolean isManual,
                                                  List<AlterInter> alters)
+    {
+        return checkConfiguration(isManual, alters, null);
+    }
+
+    private static KeyConfig checkConfiguration (boolean isManual,
+                                                 List<AlterInter> alters,
+                                                 Integer keyInForce)
     {
         final AlterInter firstAlter = alters.get(0);
         final Shape firstShape = firstAlter.getShape();
@@ -1207,7 +1218,7 @@ public class KeyInter
         final int[] pitches;
         if (firstShape == Shape.NATURAL) {
             // Special case for Natural (cancel key): we use fifths/pitches of the effective key
-            cancelFifths = getNaturalFifths(firstAlter);
+            cancelFifths = (keyInForce != null) ? keyInForce : getNaturalFifths(firstAlter);
 
             if ((cancelFifths == null) || (cancelFifths == 0)) {
                 logger.info("No effective key before {}", firstAlter);

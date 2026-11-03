@@ -1832,7 +1832,7 @@ public class PartwiseBuilder
         final Set<AbstractChordInter> chords = measure.getStandardChords();
 
         return (center != null) && !chords.isEmpty() && chords.stream().allMatch(
-                chord -> chord.getCenter().x < center.x);
+                chord -> (chord.getCenter() != null) && (chord.getCenter().x < center.x));
     }
 
     //----------------//

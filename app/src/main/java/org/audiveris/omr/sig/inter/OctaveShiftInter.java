@@ -1104,7 +1104,7 @@ public class OctaveShiftInter
             int thinRow = -1;
 
             for (int y = row - 1; y <= row + 1; y++) {
-                if (binary.get(x, y) == PixelSource.FOREGROUND) {
+                if (isInk(binary, x, y)) {
                     lastInk = x;
 
                     if ((thinRow == -1) && (Math.abs(y - bestRow) <= maxDrift)
@@ -1146,11 +1146,19 @@ public class OctaveShiftInter
                                       int y,
                                       int reach)
     {
-        return (binary.get(x, y) == PixelSource.FOREGROUND)
+        return isInk(binary, x, y)
                 && ((y - reach) >= 0)
                 && ((y + reach) < binary.getHeight())
-                && (binary.get(x, y - reach) != PixelSource.FOREGROUND)
-                && (binary.get(x, y + reach) != PixelSource.FOREGROUND);
+                && !isInk(binary, x, y - reach)
+                && !isInk(binary, x, y + reach);
+    }
+
+    private static boolean isInk (ByteProcessor binary,
+                                  int x,
+                                  int y)
+    {
+        return (x >= 0) && (x < binary.getWidth()) && (y >= 0) && (y < binary.getHeight())
+                && (binary.get(x, y) == PixelSource.FOREGROUND);
     }
 
     //~ Inner Classes ------------------------------------------------------------------------------
