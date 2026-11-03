@@ -1098,6 +1098,7 @@ public class KeyInter
     public static void lookupCandidates (SystemInfo system)
     {
         final double maxPitchDiff = constants.maxPitchDiff.getValue();
+        final List<KeyCandidate> candidates = new ArrayList<>();
 
         // Only AlterInter instances with shape SHARP, FLAT or NATURAL
         // No DOUBLE_SHARP or DOUBLE_FLAT
@@ -1142,9 +1143,19 @@ public class KeyInter
                     final List<AlterInter> members = staffAlters.subList(
                             i,
                             i + Math.abs(keyConfig.fifths));
-                    buildKey(keyConfig, members);
+                    candidates.add(new KeyCandidate(keyConfig, new ArrayList<>(members)));
                     i += members.size() - 1;
                 }
+            }
+        }
+
+        final int maxShift = system.getSheet().getScale().toPixels(constants.maxStaffKeyShift);
+
+        for (KeyCandidate candidate : candidates) {
+            if ((system.getStaves().size() == 1) || candidates.stream().anyMatch(
+                    other -> (other.staff() != candidate.staff()) && (Math.abs(
+                            other.left() - candidate.left()) <= maxShift))) {
+                buildKey(candidate.config(), candidate.members());
             }
         }
     }
@@ -1452,6 +1463,24 @@ public class KeyInter
         private final Constant.Ratio minContainment = new Constant.Ratio(
                 0.8,
                 "Minimum part of the smaller Alter candidate covered by the other one");
+
+        private final Fraction maxStaffKeyShift = new Fraction(
+                2.0,
+                "Maximum abscissa shift between the same key change on two staves");
+    }
+
+    private record KeyCandidate (KeyConfig config,
+                                 List<AlterInter> members)
+    {
+        Staff staff ()
+        {
+            return members.get(0).getStaff();
+        }
+
+        int left ()
+        {
+            return members.get(0).getBounds().x;
+        }
     }
 
     //-----------//
