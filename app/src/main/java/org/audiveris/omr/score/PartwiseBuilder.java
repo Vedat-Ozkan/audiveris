@@ -769,7 +769,8 @@ public class PartwiseBuilder
         final Staff staff = note.getStaff();
         final Point center = note.getChord().getCenter();
 
-        for (OctaveShiftInter os : octaveShiftNumbers.keySet()) {
+        for (Inter inter : note.getSig().inters(OctaveShiftInter.class)) {
+            final OctaveShiftInter os = (OctaveShiftInter) inter;
             if (os.getStaff() == staff) {
                 final AbstractChordInter first = os.getChord(LEFT);
                 if (first == null) {

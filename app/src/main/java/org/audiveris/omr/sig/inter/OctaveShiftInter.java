@@ -786,7 +786,7 @@ public class OctaveShiftInter
             final AbstractChordInter chord = it.next();
             final Point center = chord.getCenter();
 
-            if (center.x < line.getX1() || center.x > line.getX2()) {
+            if (!(chord instanceof HeadChordInter) || center.x < line.getX1() || center.x > line.getX2()) {
                 it.remove();
             }
         }
