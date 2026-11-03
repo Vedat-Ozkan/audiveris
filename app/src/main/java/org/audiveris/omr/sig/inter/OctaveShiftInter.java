@@ -24,8 +24,10 @@ package org.audiveris.omr.sig.inter;
 import org.audiveris.omr.constant.ConstantSet;
 import org.audiveris.omr.glyph.Glyph;
 import org.audiveris.omr.glyph.Shape;
+import org.audiveris.omr.image.PixelSource;
 import org.audiveris.omr.math.PointUtil;
 import org.audiveris.omr.sheet.Part;
+import org.audiveris.omr.sheet.Picture;
 import org.audiveris.omr.sheet.Scale;
 import org.audiveris.omr.sheet.Sheet;
 import org.audiveris.omr.sheet.Staff;
@@ -59,6 +61,8 @@ import static org.audiveris.omr.util.HorizontalSide.*;
 import org.audiveris.omr.util.Jaxb;
 import static org.audiveris.omr.util.VerticalSide.*;
 import org.audiveris.omr.util.WrappedBoolean;
+
+import ij.process.ByteProcessor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -897,15 +901,67 @@ public class OctaveShiftInter
             return null;
         }
 
-        //TODO: Can we check for presence of a long dashed line???
-        //
         final OctaveShiftInter os = new OctaveShiftInter(glyph, shape, null, grade);
-        final Scale scale = staff.getSystem().getSheet().getScale();
+        final Sheet sheet = staff.getSystem().getSheet();
+        final Scale scale = sheet.getScale();
         final int lineLg = scale.toPixels(DEFAULT_LINE_LENGTH);
-        os.line = new Line2D.Double(center, new Point(center.x + lineLg, center.y));
+        final int dashedEnd = dashedLineEnd(
+                sheet.getPicture().getSource(Picture.SourceKey.BINARY),
+                glyph.getBounds(),
+                staff.getAbscissa(RIGHT),
+                scale);
+        os.line = new Line2D.Double(
+                center,
+                new Point(Math.max(center.x + lineLg, dashedEnd), center.y));
         os.setStaff(staff);
 
         return os;
+    }
+
+    //---------------//
+    // dashedLineEnd //
+    //---------------//
+    private static int dashedLineEnd (ByteProcessor binary,
+                                      Rectangle valueBox,
+                                      int staffRight,
+                                      Scale scale)
+    {
+        final int start = valueBox.x + valueBox.width;
+        final int probe = Math.min(staffRight, start + scale.toPixels(constants.dashProbeLength));
+        int bestRow = -1;
+        int bestCount = 0;
+
+        for (int y = valueBox.y; y < valueBox.y + valueBox.height; y++) {
+            int count = 0;
+
+            for (int x = start; x < probe; x++) {
+                if (binary.get(x, y) == PixelSource.FOREGROUND) {
+                    count++;
+                }
+            }
+
+            if (count > bestCount) {
+                bestCount = count;
+                bestRow = y;
+            }
+        }
+
+        if (bestCount < scale.toPixels(constants.minDashInk)) {
+            return start;
+        }
+
+        final int maxGap = scale.toPixels(constants.maxDashGap);
+        int lastInk = start;
+
+        for (int x = start; x <= staffRight && x - lastInk <= maxGap; x++) {
+            for (int y = bestRow - 1; y <= bestRow + 1; y++) {
+                if (binary.get(x, y) == PixelSource.FOREGROUND) {
+                    lastInk = x;
+                }
+            }
+        }
+
+        return lastInk;
     }
 
     //~ Inner Classes ------------------------------------------------------------------------------
@@ -919,6 +975,18 @@ public class OctaveShiftInter
         private final Scale.Fraction minGapFromStaff = new Scale.Fraction(
                 2.0,
                 "Minimum vertical gap from upper or lower staff");
+
+        private final Scale.Fraction dashProbeLength = new Scale.Fraction(
+                3.0,
+                "Length right of the value where the dashed line row is looked for");
+
+        private final Scale.Fraction minDashInk = new Scale.Fraction(
+                0.8,
+                "Minimum ink on the dashed line row within the probe length");
+
+        private final Scale.Fraction maxDashGap = new Scale.Fraction(
+                2.0,
+                "Maximum gap between two dashes of the line");
     }
 
     //--------//
