@@ -539,11 +539,15 @@ public class ClefInter
     {
         final double offset = Math.abs(staff.pitchPositionOf(glyph.getCenter2D()) - constants.bassClefCenterPitch.getValue());
         final double height = glyph.getBounds().height / (double) staff.getSpecificInterline();
+        final double width = glyph.getBounds().width / (double) staff.getSpecificInterline();
         final double tolerance = constants.heightTolerance.getValue();
+        final double widthTolerance = constants.widthTolerance.getValue();
 
         return offset <= constants.maxLineOffset.getValue()
-                && (Math.abs(height / constants.bassClefHeight.getValue() - 1) <= tolerance
-                        || Math.abs(height / constants.smallBassClefHeight.getValue() - 1) <= tolerance);
+                && ((Math.abs(height / constants.bassClefHeight.getValue() - 1) <= tolerance
+                        && Math.abs(width / constants.bassClefWidth.getValue() - 1) <= widthTolerance)
+                        || (Math.abs(height / constants.smallBassClefHeight.getValue() - 1) <= tolerance
+                                && Math.abs(width / constants.smallBassClefWidth.getValue() - 1) <= widthTolerance));
     }
 
     //---------//
@@ -793,9 +797,23 @@ public class ClefInter
                 2.8,
                 "Typical small bass clef height");
 
+        private final Constant.Double bassClefWidth = new Constant.Double(
+                "interline",
+                2.7,
+                "Typical bass clef width");
+
+        private final Constant.Double smallBassClefWidth = new Constant.Double(
+                "interline",
+                2.1,
+                "Typical small bass clef width");
+
         private final Constant.Ratio heightTolerance = new Constant.Ratio(
                 0.12,
                 "Relative height tolerance for a bass clef");
+
+        private final Constant.Ratio widthTolerance = new Constant.Ratio(
+                0.2,
+                "Relative width tolerance for a bass clef");
     }
 
     //----------//
