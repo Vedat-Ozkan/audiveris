@@ -239,6 +239,10 @@ public class SymbolsFilter
         private final Constant.Ratio minStemContextualGrade = new Constant.Ratio(
                 0.7,
                 "Minimum contextual grade to hide a stem");
+
+        private final Constant.Ratio minLyricContextualGrade = new Constant.Ratio(
+                0.6,
+                "Minimum contextual grade to hide a lyric item");
     }
 
     //----------------//
@@ -305,6 +309,10 @@ public class SymbolsFilter
                 return ctxGrade >= constants.minHeadContextualGrade.getValue();
             }
 
+            if (inter instanceof LyricItemInter) {
+                return ctxGrade >= constants.minLyricContextualGrade.getValue();
+            }
+
             return super.canHide(inter);
         }
 
@@ -349,7 +357,7 @@ public class SymbolsFilter
 
                     // Save the lyrics
                     if (inter instanceof LyricItemInter item) {
-                        strongs.add(item);
+                        (canHide(item) ? strongs : weaks).add(item);
                         continue;
                     }
 
