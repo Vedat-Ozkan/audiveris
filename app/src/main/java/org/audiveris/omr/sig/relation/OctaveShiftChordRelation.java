@@ -42,6 +42,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlRootElement(name = "octave-shift-chord")
 public class OctaveShiftChordRelation
         extends Support
+        implements SidedRelation
 {
     //~ Instance fields ----------------------------------------------------------------------------
 
@@ -100,6 +101,7 @@ public class OctaveShiftChordRelation
     /**
      * @return the side
      */
+    @Override
     public HorizontalSide getSide ()
     {
         return side;

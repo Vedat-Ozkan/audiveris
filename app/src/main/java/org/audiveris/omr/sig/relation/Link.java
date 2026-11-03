@@ -99,12 +99,22 @@ public class Link
         final Inter target = outgoing ? partner : inter;
 
         if (!source.isRemoved() && !target.isRemoved()) {
-            if (null == sig.getRelation(source, target, relation.getClass())) {
+            if (sig.getAllEdges(source, target).stream().noneMatch(this::isSameAs)) {
                 return sig.addEdge(source, target, relation);
             }
         }
 
         return false;
+    }
+
+    private boolean isSameAs (Relation existing)
+    {
+        if (!relation.getClass().isInstance(existing)) {
+            return false;
+        }
+
+        return !(relation instanceof SidedRelation sided)
+                || (sided.getSide() == ((SidedRelation) existing).getSide());
     }
 
     //------------//

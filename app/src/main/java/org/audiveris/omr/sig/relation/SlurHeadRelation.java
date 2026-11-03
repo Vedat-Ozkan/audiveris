@@ -51,6 +51,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlRootElement(name = "slur-head")
 public class SlurHeadRelation
         extends Support
+        implements SidedRelation
 {
     //~ Static fields/initializers -----------------------------------------------------------------
 
@@ -145,6 +146,7 @@ public class SlurHeadRelation
     /**
      * @return the side
      */
+    @Override
     public HorizontalSide getSide ()
     {
         return side;

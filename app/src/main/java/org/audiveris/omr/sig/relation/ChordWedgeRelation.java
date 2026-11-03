@@ -43,6 +43,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlRootElement(name = "chord-wedge")
 public class ChordWedgeRelation
         extends Support
+        implements SidedRelation
 {
     //~ Instance fields ----------------------------------------------------------------------------
 
@@ -98,6 +99,7 @@ public class ChordWedgeRelation
     /**
      * @return the side
      */
+    @Override
     public HorizontalSide getSide ()
     {
         return side;
