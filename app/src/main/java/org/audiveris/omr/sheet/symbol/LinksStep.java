@@ -29,6 +29,7 @@ import org.audiveris.omr.sheet.rhythm.MeasureFiller;
 import org.audiveris.omr.sig.BeamHeadCleaner;
 import org.audiveris.omr.sig.SigReducer;
 import org.audiveris.omr.sig.inter.HeadChordInter;
+import org.audiveris.omr.sig.inter.OctaveShiftInter;
 import org.audiveris.omr.sig.inter.Inter;
 import org.audiveris.omr.sig.inter.LyricItemInter;
 import org.audiveris.omr.sig.inter.SentenceInter;
@@ -104,6 +105,8 @@ public class LinksStep
         throws StepException
     {
         // Check for ties in same staff, now that head alterations and clef changes are available
+        OctaveShiftInter.continueAcrossSystems(sheet);
+
         for (SystemInfo system : sheet.getSystems()) {
             List<Inter> systemHeadChords = system.getSig().inters(HeadChordInter.class);
 

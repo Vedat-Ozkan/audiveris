@@ -150,6 +150,8 @@ public class OctaveShiftInter
 
     private boolean dashed;
 
+    private int dashRow;
+
     /** Optional hook end. */
     @XmlElement(name = "hook")
     @XmlJavaTypeAdapter(Jaxb.Point2DAdapter.class)
@@ -905,11 +907,13 @@ public class OctaveShiftInter
         final Sheet sheet = system.getSheet();
         final Scale scale = sheet.getScale();
         final int lineLg = scale.toPixels(DEFAULT_LINE_LENGTH);
-        final int dashedEnd = dashedLineEnd(
+        final Point dashes = dashedLineEnd(
                 sheet.getPicture().getSource(Picture.SourceKey.BINARY),
                 glyph.getBounds(),
                 closestStaff.getAbscissa(RIGHT),
+                scale.toPixels(constants.dashProbeLength),
                 scale);
+        final int dashedEnd = dashes.x;
         final Staff staff = staffWithNotesNearest(
                 system.getStavesAround(center),
                 center.x,
@@ -920,9 +924,96 @@ public class OctaveShiftInter
                 center,
                 new Point(Math.max(center.x + lineLg, dashedEnd), center.y));
         os.dashed = dashedEnd > center.x + lineLg;
+        os.dashRow = dashes.y;
         os.setStaff(staff);
 
         return os;
+    }
+
+    //-----------------------//
+    // continueAcrossSystems //
+    //-----------------------//
+    public static void continueAcrossSystems (Sheet sheet)
+    {
+        final Scale scale = sheet.getScale();
+        final ByteProcessor binary = sheet.getPicture().getSource(Picture.SourceKey.BINARY);
+        final int interline = scale.getInterline();
+        final int minLength = scale.toPixels(DEFAULT_LINE_LENGTH);
+
+        for (SystemInfo system : sheet.getSystems()) {
+            final SystemInfo next = system.getNextInPage();
+
+            if (next == null) {
+                continue;
+            }
+
+            for (Inter inter : system.getSig().inters(OctaveShiftInter.class)) {
+                final OctaveShiftInter os = (OctaveShiftInter) inter;
+                final Staff staff = os.getStaff();
+
+                if ((staff == null) || (os.line.getX2() < staff.getAbscissa(RIGHT) - interline)) {
+                    continue;
+                }
+
+                final Part nextPart = staff.getPart().getNextInPage();
+                final int index = staff.getIndexInPart();
+
+                if ((nextPart == null) || (index >= nextPart.getStaves().size())) {
+                    continue;
+                }
+
+                final Staff nextStaff = nextPart.getStaves().get(index);
+                final int start = nextStaff.getHeaderStop();
+
+                if (startsNear(next, nextStaff, start + 3 * interline)) {
+                    continue;
+                }
+
+                if (!os.dashed) {
+                    continue;
+                }
+
+                final double offset = os.dashRow - staff.getFirstLine().yAt(os.line.getX2());
+                final int row = (int) Math.rint(nextStaff.getFirstLine().yAt(start) + offset);
+                final Point dashes = dashedLineEnd(
+                        binary,
+                        new Rectangle(start, row - interline / 2, 1, interline),
+                        nextStaff.getAbscissa(RIGHT),
+                        scale.toPixels(constants.continuationProbeLength),
+                        scale);
+
+                if (dashes.x <= start + minLength) {
+                    continue;
+                }
+
+                final OctaveShiftInter continued = new OctaveShiftInter(null, os.shape, os.kind, os.getGrade());
+                continued.line = new Line2D.Double(start, dashes.y, dashes.x, dashes.y);
+                continued.dashed = true;
+                continued.dashRow = dashes.y;
+                continued.computeValueDimensions(sheet);
+                next.getSig().addVertex(continued);
+                continued.setStaff(nextStaff);
+
+                for (Link link : continued.searchLinks(next)) {
+                    link.applyTo(continued);
+                }
+            }
+        }
+    }
+
+    private static boolean startsNear (SystemInfo system,
+                                       Staff staff,
+                                       int maxX)
+    {
+        for (Inter inter : system.getSig().inters(OctaveShiftInter.class)) {
+            final OctaveShiftInter os = (OctaveShiftInter) inter;
+
+            if ((os.getStaff() == staff) && (os.line.getX1() <= maxX)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     //-----------------------//
@@ -972,13 +1063,14 @@ public class OctaveShiftInter
     //---------------//
     // dashedLineEnd //
     //---------------//
-    private static int dashedLineEnd (ByteProcessor binary,
-                                      Rectangle valueBox,
-                                      int staffRight,
-                                      Scale scale)
+    private static Point dashedLineEnd (ByteProcessor binary,
+                                        Rectangle valueBox,
+                                        int staffRight,
+                                        int probeLength,
+                                        Scale scale)
     {
         final int start = valueBox.x + valueBox.width;
-        final int probe = Math.min(staffRight, start + scale.toPixels(constants.dashProbeLength));
+        final int probe = Math.min(staffRight, start + probeLength);
         int bestRow = -1;
         int bestCount = 0;
 
@@ -998,7 +1090,7 @@ public class OctaveShiftInter
         }
 
         if (bestCount < scale.toPixels(constants.minDashInk)) {
-            return start;
+            return new Point(start, bestRow);
         }
 
         final int maxGap = scale.toPixels(constants.maxDashGap);
@@ -1012,7 +1104,7 @@ public class OctaveShiftInter
             }
         }
 
-        return lastInk;
+        return new Point(lastInk, bestRow);
     }
 
     //~ Inner Classes ------------------------------------------------------------------------------
@@ -1030,6 +1122,10 @@ public class OctaveShiftInter
         private final Scale.Fraction dashProbeLength = new Scale.Fraction(
                 3.0,
                 "Length right of the value where the dashed line row is looked for");
+
+        private final Scale.Fraction continuationProbeLength = new Scale.Fraction(
+                6.0,
+                "Length after a staff header where a continued dashed line is looked for");
 
         private final Scale.Fraction minDashInk = new Scale.Fraction(
                 0.8,
