@@ -320,6 +320,8 @@ public class AlterInter
             AlterHeadRelation bestRel = null;
             Inter bestHead = null;
             double bestYGap = Double.MAX_VALUE;
+            double bestXGap = Double.MAX_VALUE;
+            final int samePitchYGap = scale.toPixels(constants.samePitchYGap);
 
             final boolean small = isSmall(scale);
 
@@ -341,10 +343,13 @@ public class AlterInter
                 rel.setOutGaps(scale.pixelsToFrac(xGap), scale.pixelsToFrac(yGap), profile);
 
                 if (rel.getGrade() >= rel.getMinGrade()) {
-                    if ((bestRel == null) || (bestYGap > yGap)) {
+                    final boolean samePitch = Math.abs(bestYGap - yGap) <= samePitchYGap;
+
+                    if ((bestRel == null) || (samePitch ? (xGap < bestXGap) : (yGap < bestYGap))) {
                         bestRel = rel;
                         bestHead = head;
                         bestYGap = yGap;
+                        bestXGap = xGap;
                     }
                 }
             }
@@ -621,6 +626,10 @@ public class AlterInter
     private static class Constants
             extends ConstantSet
     {
+        private final Scale.Fraction samePitchYGap = new Scale.Fraction(
+                0.25,
+                "Vertical gaps closer than this point at the same pitch");
+
         private final Scale.Fraction flatTypicalHeight = new Scale.Fraction(
                 2.7,
                 "Typical flat height");
