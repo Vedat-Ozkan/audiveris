@@ -348,7 +348,11 @@ public class KeyInter
      */
     public Integer getFifths ()
     {
-        if ((fifths == null) && !isCancel()) {
+        if (isCancel()) {
+            return 0;
+        }
+
+        if (fifths == null) {
             if ((sig != null) && sig.containsVertex(this)) {
                 final List<Inter> alters = getMembers();
                 int count = 0;
@@ -1353,6 +1357,7 @@ public class KeyInter
     private static void filterOverlappingAlters (List<AlterInter> alters)
     {
         final double minOverlapIou = constants.minOverlapIou.getValue();
+        final double minContainment = constants.minContainment.getValue();
 
         for (int i = 0; i < alters.size(); i++) {
             final AlterInter left = alters.get(i);
@@ -1366,7 +1371,8 @@ public class KeyInter
                     break; // Since the sequence is sorted by abscissa
                 }
 
-                if (GeoUtil.iou(leftBox, rightBox) >= minOverlapIou) {
+                if ((GeoUtil.iou(leftBox, rightBox) >= minOverlapIou)
+                        || (GeoUtil.intersectionOverSmaller(leftBox, rightBox) >= minContainment)) {
                     // We have an overlap, we keep the best graded candidate
                     if (left.getGrade() >= right.getGrade()) {
                         alters.remove(j--);
@@ -1442,6 +1448,10 @@ public class KeyInter
         private final Constant.Ratio minOverlapIou = new Constant.Ratio(
                 0.4,
                 "Minimum IOU to detect overlap between Alter candidates");
+
+        private final Constant.Ratio minContainment = new Constant.Ratio(
+                0.8,
+                "Minimum part of the smaller Alter candidate covered by the other one");
     }
 
     //-----------//

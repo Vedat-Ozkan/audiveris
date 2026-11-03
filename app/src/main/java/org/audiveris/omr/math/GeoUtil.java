@@ -103,6 +103,20 @@ public abstract class GeoUtil
                 rect.getY() + (rect.getHeight() / 2.0));
     }
 
+    public static double intersectionOverSmaller (Rectangle one,
+                                                  Rectangle two)
+    {
+        final Rectangle inter = one.intersection(two);
+
+        if (inter.isEmpty()) {
+            return 0;
+        }
+
+        final int smallerArea = Math.min(one.width * one.height, two.width * two.height);
+
+        return (double) (inter.width * inter.height) / smallerArea;
+    }
+
     //-----//
     // iou //
     //-----//
