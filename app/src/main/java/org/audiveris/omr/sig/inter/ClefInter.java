@@ -21,6 +21,8 @@
 // </editor-fold>
 package org.audiveris.omr.sig.inter;
 
+import org.audiveris.omr.constant.Constant;
+import org.audiveris.omr.constant.ConstantSet;
 import org.audiveris.omr.glyph.Glyph;
 import org.audiveris.omr.glyph.Shape;
 import org.audiveris.omr.math.GeoUtil;
@@ -508,10 +510,17 @@ public class ClefInter
             case G_CLEF, G_CLEF_SMALL, G_CLEF_8VA, G_CLEF_8VB -> //
                     new ClefInter(glyph, shape, grade, staff, ClefKind.TREBLE);
 
-            case C_CLEF, F_CLEF, F_CLEF_SMALL -> {
+            case C_CLEF -> {
                 final Point2D center = glyph.getCenter2D();
                 final ClefKind kind = kindOf(center, shape, staff); // TODO: check this!
                 yield new ClefInter(glyph, shape, grade, staff, kind);
+            }
+
+            case F_CLEF, F_CLEF_SMALL -> {
+                final Point2D center = glyph.getCenter2D();
+                final ClefKind kind = kindOf(center, shape, staff); // TODO: check this!
+                final double supported = fitsBassClefDrawing(glyph, staff) ? grade + (1 - grade) * constants.drawingSupport.getValue() : grade;
+                yield new ClefInter(glyph, shape, supported, staff, kind);
             }
 
             case F_CLEF_8VA, F_CLEF_8VB -> //
@@ -520,6 +529,21 @@ public class ClefInter
             case PERCUSSION_CLEF -> //
                     new ClefInter(glyph, shape, grade, staff, ClefKind.PERCUSSION);
         };
+    }
+
+    //---------------------//
+    // fitsBassClefDrawing //
+    //---------------------//
+    private static boolean fitsBassClefDrawing (Glyph glyph,
+                                                Staff staff)
+    {
+        final double offset = Math.abs(staff.pitchPositionOf(glyph.getCenter2D()) - constants.bassClefCenterPitch.getValue());
+        final double height = glyph.getBounds().height / (double) staff.getSpecificInterline();
+        final double tolerance = constants.heightTolerance.getValue();
+
+        return offset <= constants.maxLineOffset.getValue()
+                && (Math.abs(height / constants.bassClefHeight.getValue() - 1) <= tolerance
+                        || Math.abs(height / constants.smallBassClefHeight.getValue() - 1) <= tolerance);
     }
 
     //---------//
@@ -739,6 +763,40 @@ public class ClefInter
     }
 
     //~ Inner Classes ------------------------------------------------------------------------------
+
+    private static final Constants constants = new Constants();
+
+    private static class Constants
+            extends ConstantSet
+    {
+        private final Constant.Ratio drawingSupport = new Constant.Ratio(
+                0.5,
+                "Share of the missing grade added to a bass clef placed and sized like one");
+
+        private final Constant.Double bassClefCenterPitch = new Constant.Double(
+                "pitch",
+                -0.7,
+                "Typical pitch of a bass clef centre");
+
+        private final Constant.Double maxLineOffset = new Constant.Double(
+                "pitch",
+                0.5,
+                "Maximum pitch offset of a bass clef centre from its typical pitch");
+
+        private final Constant.Double bassClefHeight = new Constant.Double(
+                "interline",
+                3.5,
+                "Typical bass clef height");
+
+        private final Constant.Double smallBassClefHeight = new Constant.Double(
+                "interline",
+                2.8,
+                "Typical small bass clef height");
+
+        private final Constant.Ratio heightTolerance = new Constant.Ratio(
+                0.12,
+                "Relative height tolerance for a bass clef");
+    }
 
     //----------//
     // ClefKind //
