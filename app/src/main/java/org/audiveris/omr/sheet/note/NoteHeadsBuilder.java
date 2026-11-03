@@ -709,7 +709,8 @@ public class NoteHeadsBuilder
             final Evaluation[] evals = classifier.evaluate(ink, scale.getInterline(), 1, 0.0, null);
 
             if ((evals.length == 0) || !TREBLE_CLEFS.contains(evals[0].shape)
-                    || (evals[0].grade < constants.minClefGrade.getValue())) {
+                    || (ClefInter.drawnGrade(evals[0].shape, evals[0].grade, ink, staff)
+                            < constants.minClefGrade.getValue())) {
                 continue;
             }
 
