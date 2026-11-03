@@ -21,10 +21,12 @@
 // </editor-fold>
 package org.audiveris.omr.ui.symbol;
 
+import org.audiveris.omr.WellKnowns;
 import org.audiveris.omr.constant.Constant;
 import org.audiveris.omr.constant.ConstantSet;
 import org.audiveris.omr.text.FontAttributes;
 import org.audiveris.omr.text.FontInfo;
+import org.audiveris.omr.util.UriUtil;
 import org.audiveris.omr.util.param.ConstantBasedParam;
 import org.audiveris.omr.util.param.Param;
 
@@ -32,6 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.awt.Font;
+import java.awt.FontFormatException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Map;
 
 /**
  * Class <code>TextFont</code> is meant to simplify the use of text font for pieces of text
@@ -47,6 +53,14 @@ public class TextFont
     private static final Constants constants = new Constants();
 
     private static final Logger logger = LoggerFactory.getLogger(TextFont.class);
+
+    private static final Map<String, Font[]> BUNDLED_FACES = Map.of(
+            Font.SANS_SERIF,
+            loadFaces("DejaVuSans", "", "-Bold", "-Oblique", "-BoldOblique"),
+            Font.SERIF,
+            loadFaces("DejaVuSerif", "", "-Bold", "-Italic", "-BoldItalic"),
+            Font.MONOSPACED,
+            loadFaces("DejaVuSansMono", "", "-Bold", "-Oblique", "-BoldOblique"));
 
     /** Ratio from a 300 DPI scan to font point-size (72 pt/inch). */
     public static final float TO_POINT = 72f / 300f;
@@ -110,7 +124,7 @@ public class TextFont
                      int style,
                      int size)
     {
-        super(fontName, fileName, style, size);
+        super(textFont(fontName, fileName, style, size));
     }
 
     //~ Methods ------------------------------------------------------------------------------------
@@ -176,6 +190,43 @@ public class TextFont
                                               int pointSize)
     {
         return getTextFont(family, pointSize);
+    }
+
+    //----------//
+    // textFont //
+    //----------//
+    private static Font textFont (String fontName,
+                                  String fileName,
+                                  int style,
+                                  int size)
+    {
+        final Font[] faces = (fileName == null) ? BUNDLED_FACES.get(fontName.replace(" ", ""))
+                : null;
+
+        return (faces != null) ? faces[style].deriveFont((float) size)
+                : getFont(fontName, fileName, style, size);
+    }
+
+    //-----------//
+    // loadFaces //
+    //-----------//
+    private static Font[] loadFaces (String family,
+                                     String... suffixes)
+    {
+        final Font[] faces = new Font[suffixes.length];
+
+        for (int style = 0; style < suffixes.length; style++) {
+            final String fileName = family + suffixes[style] + ".ttf";
+
+            try (InputStream input = UriUtil.toURI(WellKnowns.RES_URI, fileName).toURL()
+                    .openStream()) {
+                faces[style] = Font.createFont(Font.TRUETYPE_FONT, input);
+            } catch (FontFormatException | IOException ex) {
+                throw new IllegalStateException("Cannot load bundled font " + fileName, ex);
+            }
+        }
+
+        return faces;
     }
 
     //-------------//
