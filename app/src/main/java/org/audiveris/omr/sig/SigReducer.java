@@ -43,6 +43,7 @@ import org.audiveris.omr.sig.inter.AbstractTimeInter;
 import org.audiveris.omr.sig.inter.AlterInter;
 import org.audiveris.omr.sig.inter.AugmentationDotInter;
 import org.audiveris.omr.sig.inter.BarlineInter;
+import org.audiveris.omr.sig.inter.ClefInter;
 import org.audiveris.omr.sig.inter.BeamGroupInter;
 import org.audiveris.omr.sig.inter.BeamHookInter;
 import org.audiveris.omr.sig.inter.BeamInter;
@@ -154,7 +155,7 @@ public class SigReducer
 
     /** Inter classes that can overlap with a slur. */
     private static final Class<?>[] slurCompClasses = new Class<?>[] { AbstractFlagInter.class,
-            AlterInter.class, BarlineInter.class, StaffBarlineInter.class };
+            AlterInter.class, BarlineInter.class, ClefInter.class, StaffBarlineInter.class };
 
     /** Inter classes that can overlap with a stem. */
     private static final Class<?>[] stemCompClasses = new Class<?>[] { SlurInter.class,
