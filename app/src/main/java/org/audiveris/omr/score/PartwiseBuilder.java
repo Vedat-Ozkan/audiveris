@@ -1790,26 +1790,49 @@ public class PartwiseBuilder
      */
     private void processKeys ()
     {
-        // Something to process?
-        if (current.measure.hasKeys()) {
-            // Check if all keys are the same across all staves in measure
-            if (current.measure.hasSameKeys()) {
-                processKey(current.measure.getKey(0), true); // global: true
-            } else {
-                // Work staff by staff
-                final int staffCount = current.measure.getPart().getStaves().size();
+        final int staffCount = current.measure.getPart().getStaves().size();
+        final List<KeyInter> keys = new ArrayList<>();
 
-                for (int index = 0; index < staffCount; index++) {
-                    KeyInter key = current.measure.getKey(index);
-                    processKey(key, false); // global: false
-                }
-            }
-        } else {
+        for (int index = 0; index < staffCount; index++) {
+            keys.add(openingKey(current.measure, index));
+        }
+
+        if (keys.stream().allMatch(Objects::isNull)) {
             // No key signature in measure: this is meaningful only at beginning of staff
             if (isFirst.measure) {
                 processKeyVoid();
             }
+        } else if (keys.stream().noneMatch(Objects::isNull)
+                && (keys.stream().map(KeyInter::getFifths).distinct().count() == 1)) {
+            processKey(keys.get(0), true); // global: true
+        } else {
+            keys.forEach(key -> processKey(key, false)); // global: false
         }
+    }
+
+    private static KeyInter openingKey (Measure measure,
+                                        int staffIndex)
+    {
+        final KeyInter key = measure.getKey(staffIndex);
+
+        if ((key != null) && !isTrailing(key, measure)) {
+            return key;
+        }
+
+        final Measure previous = measure.getPrecedingInSystem();
+        final KeyInter previousKey = (previous != null) ? previous.getKey(staffIndex) : null;
+
+        return ((previousKey != null) && isTrailing(previousKey, previous)) ? previousKey : null;
+    }
+
+    private static boolean isTrailing (KeyInter key,
+                                       Measure measure)
+    {
+        final Point center = key.getCenter();
+        final Set<AbstractChordInter> chords = measure.getStandardChords();
+
+        return (center != null) && !chords.isEmpty() && chords.stream().allMatch(
+                chord -> chord.getCenter().x < center.x);
     }
 
     //----------------//
