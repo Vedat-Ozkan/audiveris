@@ -32,6 +32,7 @@ import org.audiveris.omr.glyph.GlyphGroup;
 import org.audiveris.omr.glyph.GlyphLink;
 import org.audiveris.omr.glyph.Glyphs;
 import org.audiveris.omr.glyph.Grades;
+import org.audiveris.omr.glyph.Shape;
 import org.audiveris.omr.math.GeoUtil;
 import org.audiveris.omr.sheet.Scale;
 import org.audiveris.omr.sheet.Sheet;
@@ -204,12 +205,12 @@ public class SymbolsBuilder
             return;
         }
 
-        final Evaluation[] evals = classifier.evaluate(
+        final List<Evaluation> evals = withClefSizesMerged(classifier.evaluate(
                 glyph,
                 system,
                 constants.maxEvaluationCount.getValue(),
                 Grades.symbolMinGrade,
-                EnumSet.of(Classifier.Condition.CHECKED));
+                EnumSet.of(Classifier.Condition.CHECKED)));
 
         // Create one interpretation for each acceptable evaluation
         final SIGraph sig = system.getSig();
@@ -231,6 +232,50 @@ public class SymbolsBuilder
                 logger.warn("Error in glyph evaluation " + ex, ex);
             }
         }
+    }
+
+    //---------------------//
+    // withClefSizesMerged //
+    //---------------------//
+    private static List<Evaluation> withClefSizesMerged (Evaluation[] evals)
+    {
+        final List<Evaluation> merged = new ArrayList<>();
+
+        for (Evaluation eval : evals) {
+            final int same = indexOfOtherSize(merged, eval.shape);
+
+            if (same < 0) {
+                merged.add(eval);
+            } else {
+                final Evaluation kept = merged.get(same);
+                merged.set(same, new Evaluation(kept.shape, Math.min(1.0, kept.grade + eval.grade)));
+            }
+        }
+
+        return merged;
+    }
+
+    private static int indexOfOtherSize (List<Evaluation> evals,
+                                         Shape shape)
+    {
+        for (int i = 0; i < evals.size(); i++) {
+            final Shape other = evals.get(i).shape;
+
+            if (other != shape && clefSign(other) != null && clefSign(other) == clefSign(shape)) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static Shape clefSign (Shape shape)
+    {
+        return switch (shape) {
+            case G_CLEF, G_CLEF_SMALL -> Shape.G_CLEF;
+            case F_CLEF, F_CLEF_SMALL -> Shape.F_CLEF;
+            default -> null;
+        };
     }
 
     //------------------//
