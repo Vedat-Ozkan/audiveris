@@ -1078,7 +1078,7 @@ public class OctaveShiftInter
             int count = 0;
 
             for (int x = start; x < probe; x++) {
-                if (binary.get(x, y) == PixelSource.FOREGROUND) {
+                if (isThinInk(binary, x, y, scale.getMaxFore() + 1)) {
                     count++;
                 }
             }
@@ -1105,6 +1105,18 @@ public class OctaveShiftInter
         }
 
         return new Point(lastInk, bestRow);
+    }
+
+    private static boolean isThinInk (ByteProcessor binary,
+                                      int x,
+                                      int y,
+                                      int reach)
+    {
+        return (binary.get(x, y) == PixelSource.FOREGROUND)
+                && ((y - reach) >= 0)
+                && ((y + reach) < binary.getHeight())
+                && (binary.get(x, y - reach) != PixelSource.FOREGROUND)
+                && (binary.get(x, y + reach) != PixelSource.FOREGROUND);
     }
 
     //~ Inner Classes ------------------------------------------------------------------------------
