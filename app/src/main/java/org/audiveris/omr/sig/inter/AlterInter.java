@@ -281,6 +281,14 @@ public class AlterInter
     private Collection<Link> lookupLinks (List<Inter> systemHeads,
                                           int profile)
     {
+        return lookupLinks(systemHeads, profile, getBounds().x + getBounds().width, false);
+    }
+
+    private Collection<Link> lookupLinks (List<Inter> systemHeads,
+                                          int profile,
+                                          int rightX,
+                                          boolean freeHeadsOnly)
+    {
         if (systemHeads.isEmpty()) {
             return Collections.emptySet();
         }
@@ -298,7 +306,7 @@ public class AlterInter
         // Accid ref point is on accid right side and precise y depends on accid shape
         Rectangle accidBox = getBounds();
         Point accidPt = new Point(
-                accidBox.x + accidBox.width,
+                rightX,
                 ((shape != Shape.FLAT) && (shape != Shape.DOUBLE_FLAT)) ? (accidBox.y
                         + (accidBox.height / 2)) : (accidBox.y + ((3 * accidBox.height) / 4)));
         Rectangle luBox = new Rectangle(accidPt.x, accidPt.y - yGapMax, xGapMax, 2 * yGapMax);
@@ -317,6 +325,10 @@ public class AlterInter
 
             for (Inter head : notes) {
                 if (small && !head.getShape().isSmallHead()) {
+                    continue;
+                }
+
+                if (freeHeadsOnly && head.getSig().hasRelation(head, AlterHeadRelation.class)) {
                     continue;
                 }
 
@@ -362,6 +374,50 @@ public class AlterInter
             case SHARP, FLAT, NATURAL -> getBounds().height < scale.toPixels(constants.smallMaxHeight);
             default -> false;
         };
+    }
+
+    //-----------------//
+    // linkPastStacked //
+    //-----------------//
+    public void linkPastStacked (List<Inter> systemHeads,
+                                 List<Inter> systemAlters)
+    {
+        if (sig.hasRelation(this, AlterHeadRelation.class)) {
+            return;
+        }
+
+        final Scale scale = sig.getSystem().getSheet().getScale();
+        final int columnGap = scale.toPixels(constants.maxColumnGap);
+        final int reach = scale.toPixels(constants.maxStackReach);
+        final Rectangle box = getBounds();
+        final int midY = box.y + box.height / 2;
+        int right = box.x + box.width;
+        boolean extended = true;
+
+        while (extended) {
+            extended = false;
+
+            for (Inter other : systemAlters) {
+                final Rectangle ob = other.getBounds();
+
+                if (other != this && sig.hasRelation(other, AlterHeadRelation.class)
+                        && ob.x > box.x && ob.x <= right + columnGap
+                        && ob.x + ob.width > right && Math.abs(ob.y + ob.height / 2 - midY) <= reach) {
+                    right = ob.x + ob.width;
+                    extended = true;
+                }
+            }
+        }
+
+        if (right == box.x + box.width) {
+            return;
+        }
+
+        final int profile = Math.max(getProfile(), sig.getSystem().getProfile());
+
+        for (Link link : lookupLinks(systemHeads, profile, right, true)) {
+            link.applyTo(this);
+        }
     }
 
     //-------------//
@@ -568,6 +624,14 @@ public class AlterInter
         private final Scale.Fraction flatTypicalHeight = new Scale.Fraction(
                 2.7,
                 "Typical flat height");
+
+        private final Scale.Fraction maxColumnGap = new Scale.Fraction(
+                0.5,
+                "Maximum gap between two columns of stacked chord accidentals");
+
+        private final Scale.Fraction maxStackReach = new Scale.Fraction(
+                4.0,
+                "Maximum vertical distance between stacked chord accidentals");
 
         private final Scale.Fraction smallMaxHeight = new Scale.Fraction(
                 2.15,

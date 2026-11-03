@@ -26,12 +26,14 @@ import org.audiveris.omr.sheet.rhythm.MeasureStack;
 import org.audiveris.omr.sheet.rhythm.TupletsBuilder;
 import org.audiveris.omr.sig.SIGraph;
 import org.audiveris.omr.sig.inter.AbstractChordInter;
+import org.audiveris.omr.sig.inter.AlterInter;
 import org.audiveris.omr.sig.inter.BeamGroupInter;
 import org.audiveris.omr.sig.inter.DynamicsInter;
 import org.audiveris.omr.sig.inter.FermataInter;
 import org.audiveris.omr.sig.inter.HeadChordInter;
 import org.audiveris.omr.sig.inter.HeadInter;
 import org.audiveris.omr.sig.inter.Inter;
+import org.audiveris.omr.sig.inter.Inters;
 import org.audiveris.omr.sig.inter.KeyInter;
 import org.audiveris.omr.sig.inter.NumberInter;
 import org.audiveris.omr.sig.inter.OctaveShiftInter;
@@ -50,6 +52,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -347,6 +350,22 @@ public class SymbolsLinker
         }
     }
 
+    //-------------------//
+    // linkStackedAlters //
+    //-------------------//
+    private void linkStackedAlters ()
+    {
+        final List<Inter> heads = sig.inters(HeadInter.class);
+        Collections.sort(heads, Inters.byAbscissa);
+
+        final List<Inter> alters = sig.inters(AlterInter.class);
+        Collections.sort(alters, Inters.byAbscissa);
+
+        for (int i = alters.size() - 1; i >= 0; i--) {
+            ((AlterInter) alters.get(i)).linkPastStacked(heads, alters);
+        }
+    }
+
     //---------//
     // process //
     //---------//
@@ -365,6 +384,7 @@ public class SymbolsLinker
         linkTuplets();
         linkOctaveShifts();
         linkNumbers();
+        linkStackedAlters();
 
         // Check for any key signature change (before "abnormal" alters are removed)
         KeyInter.lookupCandidates(system);
