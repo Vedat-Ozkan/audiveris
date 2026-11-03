@@ -148,6 +148,8 @@ public class OctaveShiftInter
     @XmlJavaTypeAdapter(Jaxb.Line2DAdapter.class)
     private Line2D line;
 
+    private boolean dashed;
+
     /** Optional hook end. */
     @XmlElement(name = "hook")
     @XmlJavaTypeAdapter(Jaxb.Point2DAdapter.class)
@@ -913,9 +915,23 @@ public class OctaveShiftInter
         os.line = new Line2D.Double(
                 center,
                 new Point(Math.max(center.x + lineLg, dashedEnd), center.y));
+        os.dashed = dashedEnd > center.x + lineLg;
         os.setStaff(staff);
 
         return os;
+    }
+
+    //---------------//
+    // isNumberOfLine //
+    //---------------//
+    public boolean isNumberOfLine (String word)
+    {
+        return dashed && word.replaceAll("\\D", "").equals(switch (shape) {
+            case OTTAVA -> "8";
+            case QUINDICESIMA -> "15";
+            case VENTIDUESIMA -> "22";
+            default -> "";
+        });
     }
 
     //---------------//

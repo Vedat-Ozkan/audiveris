@@ -58,6 +58,7 @@ import org.audiveris.omr.sig.inter.LedgerInter;
 import org.audiveris.omr.sig.inter.MeasureCountInter;
 import org.audiveris.omr.sig.inter.RestInter;
 import org.audiveris.omr.sig.inter.SentenceInter;
+import org.audiveris.omr.sig.inter.OctaveShiftInter;
 import org.audiveris.omr.sig.inter.SlurInter;
 import org.audiveris.omr.sig.inter.SmallBeamInter;
 import org.audiveris.omr.sig.inter.StaffBarlineInter;
@@ -1419,6 +1420,14 @@ public class SigReducer
                         } else if (left instanceof StringSymbolInter
                                 && right instanceof WordInter) {
                             if (wordMatchesSymbol((WordInter) right, (StringSymbolInter) left)) {
+                                right.decrease(0.5);
+                            }
+                        } else if (left instanceof WordInter && right instanceof OctaveShiftInter) {
+                            if (((OctaveShiftInter) right).isNumberOfLine(((WordInter) left).getValue())) {
+                                left.decrease(0.5);
+                            }
+                        } else if (left instanceof OctaveShiftInter && right instanceof WordInter) {
+                            if (((OctaveShiftInter) left).isNumberOfLine(((WordInter) right).getValue())) {
                                 right.decrease(0.5);
                             }
                         }
