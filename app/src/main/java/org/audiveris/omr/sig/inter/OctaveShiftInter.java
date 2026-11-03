@@ -1095,6 +1095,8 @@ public class OctaveShiftInter
 
         final int maxGap = scale.toPixels(constants.maxDashGap);
         final int reach = scale.getMaxFore() + 1;
+        final int maxDrift = scale.toPixels(constants.maxDashDrift);
+        final int dashRun = scale.toPixels(constants.minDashRun);
         int lastInk = start;
         int row = bestRow;
 
@@ -1105,7 +1107,8 @@ public class OctaveShiftInter
                 if (binary.get(x, y) == PixelSource.FOREGROUND) {
                     lastInk = x;
 
-                    if ((thinRow == -1) && isThinInk(binary, x, y, reach)) {
+                    if ((thinRow == -1) && (Math.abs(y - bestRow) <= maxDrift)
+                            && isDashRun(binary, x, y, reach, dashRun)) {
                         thinRow = y;
                     }
                 }
@@ -1117,6 +1120,25 @@ public class OctaveShiftInter
         }
 
         return new Point(lastInk, bestRow);
+    }
+
+    private static boolean isDashRun (ByteProcessor binary,
+                                      int x,
+                                      int y,
+                                      int reach,
+                                      int length)
+    {
+        if (x + length >= binary.getWidth()) {
+            return false;
+        }
+
+        for (int i = 0; i < length; i++) {
+            if (!isThinInk(binary, x + i, y, reach)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static boolean isThinInk (ByteProcessor binary,
@@ -1158,6 +1180,14 @@ public class OctaveShiftInter
         private final Scale.Fraction maxDashGap = new Scale.Fraction(
                 2.0,
                 "Maximum gap between two dashes of the line");
+
+        private final Scale.Fraction maxDashDrift = new Scale.Fraction(
+                0.33,
+                "Maximum vertical drift of a dashed line from its starting row");
+
+        private final Scale.Fraction minDashRun = new Scale.Fraction(
+                0.25,
+                "Minimum horizontal thin run for the dash trace to follow a new row");
     }
 
     //--------//
