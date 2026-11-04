@@ -2015,6 +2015,7 @@ public class Book
                                 // Let processing continue for the other stubs
                                 logger.warn("Error processing stub", ex);
                                 stub.invalidate();
+                                someFailure = theStubs.stream().noneMatch(SheetStub::isValid);
                             } finally {
                                 stub.printWatch(false);
                                 if (swap) {
@@ -2043,6 +2044,7 @@ public class Book
                             // Let processing continue for the other stubs
                             logger.warn("Error processing stub {}", ex.getMessage(), ex);
                             stub.invalidate();
+                            someFailure = theStubs.stream().noneMatch(SheetStub::isValid);
                         } finally {
                             stub.printWatch(false);
                             if (swap) {
