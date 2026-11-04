@@ -746,7 +746,7 @@ public class KeyBuilder
                 "Standard trailing length after peak for a flat item");
 
         private final Scale.Fraction minFlatTrail = new Scale.Fraction(
-                0.7,
+                0.5,
                 "Minimum trailing length after peak for a flat item");
 
         private final Scale.Fraction maxFlatTrail = new Scale.Fraction(
