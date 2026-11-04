@@ -171,6 +171,35 @@ public class MeasureFixer
         return (im == 1) && isEmpty(prevStack);
     }
 
+    //-----------------------//
+    // isSecondLineBreakHalf //
+    //-----------------------//
+    /**
+     * Check for a bar printed across a line break: the last stack of the previous system has no
+     * closing barline, this stack starts a system, and their two partial durations fill one bar.
+     *
+     * @return true if so
+     */
+    private boolean isSecondLineBreakHalf ()
+    {
+        if ((prevStack == null) || (stack != stack.getSystem().getFirstStack())
+                || (prevStack.getSystem() == stack.getSystem())) {
+            return false;
+        }
+
+        if ((prevStackTermination == null) || (prevStackTermination.compareTo(Rational.ZERO) >= 0)
+                || (stackTermination == null) || (stackTermination.compareTo(Rational.ZERO) >= 0)) {
+            return false;
+        }
+
+        if (prevStack.getFirstMeasure().getRightPartBarline() != null) {
+            return false;
+        }
+
+        return prevStackTermination.plus(stackTermination).abs().equals(
+                prevStack.getExpectedDuration());
+    }
+
     //--------------------//
     // isSecondRepeatHalf //
     //--------------------//
@@ -302,7 +331,7 @@ public class MeasureFixer
                 setId(
                         (lastId != null) ? (-lastId)
                                 : ((prevSystemLastId != null) ? (-prevSystemLastId) : 0));
-            } else if (isSecondRepeatHalf()) {
+            } else if (isSecondRepeatHalf() || isSecondLineBreakHalf()) {
                 logger.debug("secondHalf");
 
                 // Shorten actual duration for (non-implicit) previous stack
