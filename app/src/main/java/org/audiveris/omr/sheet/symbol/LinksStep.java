@@ -107,6 +107,7 @@ public class LinksStep
         // Check for ties in same staff, now that head alterations and clef changes are available
         OctaveShiftInter.fromLineWords(sheet);
         OctaveShiftInter.continueAcrossSystems(sheet);
+        OctaveShiftInter.dropLineDashes(sheet);
 
         for (SystemInfo system : sheet.getSystems()) {
             List<Inter> systemHeadChords = system.getSig().inters(HeadChordInter.class);

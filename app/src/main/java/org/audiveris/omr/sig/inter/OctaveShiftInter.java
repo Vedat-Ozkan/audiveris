@@ -130,6 +130,8 @@ public class OctaveShiftInter
 
     private static final Logger logger = LoggerFactory.getLogger(OctaveShiftInter.class);
 
+    private static final Pattern LINE_DASHES = Pattern.compile("[^\\p{L}\\p{N}]+");
+
     private static final Pattern LINE_WORD = Pattern.compile("(8|15|22)(?=[vVmMoO0\\-\u2013\u2014_])");
 
     /** For comparing interpretations by increasing staff id. */
@@ -995,6 +997,43 @@ public class OctaveShiftInter
 
                 for (Link link : os.searchLinks(system)) {
                     link.applyTo(os);
+                }
+            }
+        }
+    }
+
+    //----------------//
+    // dropLineDashes //
+    //----------------//
+    /**
+     * Remove the words that OCR made from nothing but the dashes of an octave shift line.
+     *
+     * @param sheet the sheet to process
+     */
+    public static void dropLineDashes (Sheet sheet)
+    {
+        final int interline = sheet.getScale().getInterline();
+
+        for (SystemInfo system : sheet.getSystems()) {
+            final List<Inter> shifts = system.getSig().inters(OctaveShiftInter.class);
+
+            for (Inter inter : system.getSig().inters(WordInter.class)) {
+                final WordInter word = (WordInter) inter;
+
+                if (!LINE_DASHES.matcher(word.getValue()).matches()) {
+                    continue;
+                }
+
+                final Point center = word.getCenter();
+
+                for (Inter shift : shifts) {
+                    final Line2D row = ((OctaveShiftInter) shift).line;
+
+                    if ((center.x >= row.getX1()) && (center.x <= row.getX2() + interline)
+                            && (Math.abs(center.y - row.getY1()) <= interline)) {
+                        word.remove();
+                        break;
+                    }
                 }
             }
         }
