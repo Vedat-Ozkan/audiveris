@@ -21,6 +21,7 @@
 // </editor-fold>
 package org.audiveris.omr.score;
 
+import org.audiveris.omr.math.GCD;
 import org.audiveris.omr.math.Rational;
 import org.audiveris.omr.sheet.Part;
 import org.audiveris.omr.sheet.Sheet;
@@ -198,7 +199,7 @@ public class Page
             Rational divisor = Rational.gcd(durationArray);
             logger.debug("durations={} divisor={}", Arrays.deepToString(durationArray), divisor);
 
-            return divisor.den;
+            return GCD.lcm(divisor.den, 4);
         } catch (Exception ex) {
             logger.warn(getClass().getSimpleName() + " Error visiting " + this, ex);
 
