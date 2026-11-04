@@ -311,15 +311,36 @@ public class HeadChordInter
         final StemInter stem = getStem();
 
         if ((stem != null) && !stem.isRemoved()) {
-            final Set<Relation> rels = sig.getRelations(stem, FlagStemRelation.class);
+            final List<AbstractFlagInter> flags = new ArrayList<>();
 
-            for (Relation rel : rels) {
-                AbstractFlagInter flagInter = (AbstractFlagInter) sig.getOppositeInter(stem, rel);
-                count += flagInter.getValue();
+            for (Relation rel : sig.getRelations(stem, FlagStemRelation.class)) {
+                flags.add((AbstractFlagInter) sig.getOppositeInter(stem, rel));
+            }
+
+            flags.sort(Comparator.comparingDouble(AbstractFlagInter::getGrade).reversed());
+
+            final List<AbstractFlagInter> distinct = new ArrayList<>();
+
+            for (AbstractFlagInter flag : flags) {
+                if (distinct.stream().noneMatch(other -> competeForSameInk(flag, other))) {
+                    distinct.add(flag);
+                    count += flag.getValue();
+                }
             }
         }
 
         return count;
+    }
+
+    private static boolean competeForSameInk (Inter one,
+                                              Inter two)
+    {
+        final Rectangle box1 = one.getBounds();
+        final Rectangle box2 = two.getBounds();
+        final int common = Math.min(box1.y + box1.height, box2.y + box2.height)
+                - Math.max(box1.y, box2.y);
+
+        return (2 * common) > Math.min(box1.height, box2.height);
     }
 
     //---------------//

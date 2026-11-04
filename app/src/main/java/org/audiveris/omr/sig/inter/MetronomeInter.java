@@ -1279,6 +1279,10 @@ public class MetronomeInter
                                        int charIndex,
                                        int length)
     {
+        if (charIndex < 0) {
+            return null;
+        }
+
         Rectangle noteBox = null;
 
         for (int i = 0; i < length; i++) {
@@ -1288,9 +1292,13 @@ public class MetronomeInter
 
             if (noteBox == null) {
                 noteBox = charBox;
-            } else {
+            } else if (charBox != null) {
                 noteBox = noteBox.union(charBox);
             }
+        }
+
+        if (noteBox == null) {
+            return null;
         }
 
         final List<Glyph> glyphs = glyphIndex.getContainedEntities(noteBox);

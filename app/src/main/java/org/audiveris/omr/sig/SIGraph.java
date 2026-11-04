@@ -1346,6 +1346,12 @@ public class SIGraph
             logger.info("VIP removeVertex {}", inter);
         }
 
+        for (Relation rel : new ArrayList<>(edgesOf(inter))) {
+            if (containsEdge(rel)) {
+                removeEdge(rel);
+            }
+        }
+
         return super.removeVertex(inter);
     }
 
