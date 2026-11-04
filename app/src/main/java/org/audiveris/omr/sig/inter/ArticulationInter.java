@@ -166,6 +166,7 @@ public class ArticulationInter
         final int maxDx = scale.toPixels(ChordArticulationRelation.getXOutGapMaximum(profile));
         final int maxDy = scale.toPixels(ChordArticulationRelation.getYGapMaximum(profile));
         final int minDy = scale.toPixels(ChordArticulationRelation.getYGapMinimum(profile));
+        final int maxSmallMarkDy = scale.toPixels(ChordArticulationRelation.getSmallMarkYGapMaximum());
 
         final Rectangle articBox = getBounds();
         final Point pt = getCenter();
@@ -239,6 +240,11 @@ public class ArticulationInter
             }
 
             double absYGap = Math.abs(yGap);
+
+            if (sitsNextToHead() && (absYGap > maxSmallMarkDy)) {
+                continue;
+            }
+
             ChordArticulationRelation rel = new ChordArticulationRelation();
             rel.setOutGaps(scale.pixelsToFrac(absXGap), scale.pixelsToFrac(absYGap), profile);
 
@@ -271,6 +277,14 @@ public class ArticulationInter
         final Link link = lookupLink(systemHeadChords, profile);
 
         return (link == null) ? Collections.emptyList() : Collections.singleton(link);
+    }
+
+    //----------------//
+    // sitsNextToHead //
+    //----------------//
+    private boolean sitsNextToHead ()
+    {
+        return (shape == Shape.STACCATO) || (shape == Shape.TENUTO);
     }
 
     //---------------//

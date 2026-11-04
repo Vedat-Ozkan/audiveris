@@ -153,6 +153,14 @@ public class ChordArticulationRelation
         return (Scale.Fraction) constants.getConstant(constants.yGapMax, profile);
     }
 
+    //-------------------------//
+    // getSmallMarkYGapMaximum //
+    //-------------------------//
+    public static Scale.Fraction getSmallMarkYGapMaximum ()
+    {
+        return constants.smallMarkYGapMax;
+    }
+
     //----------------//
     // getYGapMinimum //
     //----------------//
@@ -186,6 +194,10 @@ public class ChordArticulationRelation
 
         @SuppressWarnings("unused")
         private final Scale.Fraction yGapMax_p1 = new Scale.Fraction(5.0, "Idem for profile 1");
+
+        private final Scale.Fraction smallMarkYGapMax = new Scale.Fraction(
+                2.0,
+                "Maximum vertical gap between a staccato or tenuto center & chord");
 
         private final Scale.Fraction yGapMin = new Scale.Fraction(
                 0.1,
