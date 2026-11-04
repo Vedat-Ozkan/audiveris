@@ -154,6 +154,36 @@ public class PartCollation
         records.add(dir < 0 ? 0 : records.size(), record);
     }
 
+    //-----------//
+    // affiliate //
+    //-----------//
+    /**
+     * Assign the provided candidate part to the provided record.
+     *
+     * @param partRef the candidate part
+     * @param record  the record it belongs to
+     */
+    private void affiliate (PartRef partRef,
+                            Record record)
+    {
+        record.partRefs.add(partRef);
+
+        final LogicalPart logical = record.logical;
+
+        // Use name of affiliate part to define abbreviation of logical?
+        final String resAbbrev = logical.getAbbreviation();
+        if (resAbbrev == null) {
+            final String resName = logical.getName();
+            final String affiName = partRef.getName();
+            if ((affiName != null) //
+                    && !affiName.equals(resName) //
+                    && (resName == null || affiName.length() < logical.getName().length()) //
+                    && !logicalNames.contains(affiName)) {
+                logical.setAbbreviation(affiName);
+            }
+        }
+    }
+
     //---------//
     // biIndex //
     //---------//
@@ -207,6 +237,10 @@ public class PartCollation
 
             if (iSeq == 0) {
                 dispatch(sequence, records, +1, manuals);
+            } else if (manuals.isEmpty() && hasLayoutOfRecords(sequence)) {
+                for (int i = 0; i < sequence.size(); i++) {
+                    affiliate(sequence.get(i), records.get(i));
+                }
             } else {
                 if ((biRecord != null) && (biIndex != -1)) {
                     // Align on the biRecord
@@ -311,20 +345,7 @@ public class PartCollation
                 }
 
                 logger.debug("    Success");
-                record.partRefs.add(partRef);
-
-                // Use name of affiliate part to define abbreviation of logical?
-                final String resAbbrev = logical.getAbbreviation();
-                if (resAbbrev == null) {
-                    final String resName = logical.getName();
-                    final String affiName = partRef.getName();
-                    if ((affiName != null) //
-                            && !affiName.equals(resName) //
-                            && (resName == null || affiName.length() < logical.getName().length()) //
-                            && !logicalNames.contains(affiName)) {
-                        logical.setAbbreviation(affiName);
-                    }
-                }
+                affiliate(partRef, record);
 
                 continue CandidateLoop;
             }
@@ -337,6 +358,40 @@ public class PartCollation
                 logger.info("  Cannot map {} to any logical", partRef.toQualifiedString());
             }
         }
+    }
+
+    //--------------------//
+    // hasLayoutOfRecords //
+    //--------------------//
+    /**
+     * Report whether the provided system has the very same parts layout as the current records,
+     * in which case its parts are the same parts, whatever OCR read as their names.
+     *
+     * @param sequence the candidate parts of a system
+     * @return true if same part count, staff counts and line counts, in the same order
+     */
+    private boolean hasLayoutOfRecords (List<PartRef> sequence)
+    {
+        if (sequence.size() != records.size()) {
+            return false;
+        }
+
+        for (int i = 0; i < sequence.size(); i++) {
+            final PartRef partRef = sequence.get(i);
+            final LogicalPart logical = records.get(i).logical;
+
+            if (logical.getStaffCount() != partRef.getStaffCount()) {
+                return false;
+            }
+
+            if (!partRef.getStaffConfigs().isEmpty() //
+                    && !logical.getStaffConfigs().isEmpty() //
+                    && !Objects.deepEquals(logical.getStaffConfigs(), partRef.getStaffConfigs())) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     //-------------//
