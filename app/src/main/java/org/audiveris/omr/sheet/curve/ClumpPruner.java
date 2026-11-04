@@ -187,7 +187,9 @@ public class ClumpPruner
                     final HeadInter rightMirror = (HeadInter) rightHead.getMirror();
 
                     if ((leftHead.getIntegerPitch() == rightHead.getIntegerPitch()) && (leftHead
-                            .getStaff() == rightHead.getStaff())) {
+                            .getStaff() == rightHead.getStaff()) && selected.slur.endsTouchHeads(
+                                    leftHead,
+                                    rightHead)) {
                         final SlurInter slur = selected.slur;
 
                         // Check there is no other chords in between

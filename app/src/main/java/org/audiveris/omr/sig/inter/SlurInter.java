@@ -453,7 +453,8 @@ public class SlurInter
         HeadInter h1 = getHead(LEFT);
         HeadInter h2 = getHead(RIGHT);
         boolean result = (h1 != null) && (h2 != null) && (h1.getStaff() == h2.getStaff())
-                && areTieCompatible(h1, h2) && isSpaceClear(h1, h2, systemHeadChords);
+                && areTieCompatible(h1, h2) && endsTouchHeads(h1, h2)
+                && isSpaceClear(h1, h2, systemHeadChords);
         setTie(result);
 
         if (isVip()) {
@@ -501,6 +502,16 @@ public class SlurInter
         setBounds(null);
 
         return true;
+    }
+
+    public boolean endsTouchHeads (HeadInter leftHead,
+                                   HeadInter rightHead)
+    {
+        final Scale scale = leftHead.getSig().getSystem().getSheet().getScale();
+        final int maxDy = scale.toPixels(constants.maxTieEndDy);
+
+        return (verticalGap(curve.getP1(), leftHead) <= maxDy)
+                && (verticalGap(curve.getP2(), rightHead) <= maxDy);
     }
 
     //-----------//
@@ -1101,6 +1112,14 @@ public class SlurInter
         return true;
     }
 
+    private static double verticalGap (Point2D point,
+                                       HeadInter head)
+    {
+        final Rectangle box = head.getBounds();
+
+        return Math.max(0, Math.max(box.y - point.getY(), point.getY() - (box.y + box.height)));
+    }
+
     //----------------//
     // discardOrphans //
     //----------------//
@@ -1144,6 +1163,10 @@ public class SlurInter
         private final Constant.Ratio maxTieIntersection = new Constant.Ratio(
                 0.25,
                 "Maximum intersection for a chord invading a tie");
+
+        private final Scale.Fraction maxTieEndDy = new Scale.Fraction(
+                0.9,
+                "Maximum vertical gap between a tie end and its head");
 
         private final Constant.Double maxPointingDy = new Constant.Double(
                 "pixels",
