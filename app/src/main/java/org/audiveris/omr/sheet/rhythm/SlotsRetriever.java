@@ -243,7 +243,7 @@ public class SlotsRetriever
             AbstractNoteInter h1 = ch1.getLeadingNote();
             AbstractNoteInter h2 = ch2.getLeadingNote();
 
-            if (Math.abs(h1.getIntegerPitch() - h2.getIntegerPitch()) <= 2) {
+            if ((xGap <= 0) && (Math.abs(h1.getIntegerPitch() - h2.getIntegerPitch()) <= 2)) {
                 return true;
             }
         }
