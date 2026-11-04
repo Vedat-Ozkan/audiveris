@@ -105,6 +105,7 @@ public class LinksStep
         throws StepException
     {
         // Check for ties in same staff, now that head alterations and clef changes are available
+        OctaveShiftInter.fromLineWords(sheet);
         OctaveShiftInter.continueAcrossSystems(sheet);
 
         for (SystemInfo system : sheet.getSystems()) {

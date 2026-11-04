@@ -83,6 +83,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.SwingUtilities;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -127,6 +129,8 @@ public class OctaveShiftInter
     private static final Constants constants = new Constants();
 
     private static final Logger logger = LoggerFactory.getLogger(OctaveShiftInter.class);
+
+    private static final Pattern LINE_WORD = Pattern.compile("(8|15|22)(?=[vVmMoO0\\-\u2013\u2014_])");
 
     /** For comparing interpretations by increasing staff id. */
     public static final Comparator<Inter> byStaffId = (Inter i1,
@@ -930,6 +934,87 @@ public class OctaveShiftInter
         return os;
     }
 
+    //---------------//
+    // fromLineWords //
+    //---------------//
+    /**
+     * Turn into octave shifts the words that OCR took from an octave sign and its dashed line.
+     *
+     * @param sheet the sheet to process
+     */
+    public static void fromLineWords (Sheet sheet)
+    {
+        final Scale scale = sheet.getScale();
+        final ByteProcessor binary = sheet.getPicture().getSource(Picture.SourceKey.BINARY);
+        final int minLength = scale.toPixels(DEFAULT_LINE_LENGTH);
+        final int valueWidth = scale.toPixels(constants.wordValueWidth);
+
+        for (SystemInfo system : sheet.getSystems()) {
+            for (Inter inter : system.getSig().inters(WordInter.class)) {
+                final WordInter word = (WordInter) inter;
+                final Shape shape = shapeOfLineWord(word.getValue());
+                final Rectangle box = word.getBounds();
+                final Point center = word.getCenter();
+                final Staff closest = system.getClosestStaff(center);
+
+                if ((shape == null) || (closest.distanceTo(center) <= 0)) {
+                    continue;
+                }
+
+                final Rectangle value = new Rectangle(
+                        box.x,
+                        box.y,
+                        Math.min(box.width, valueWidth),
+                        box.height);
+                final Point dashes = dashedLineEnd(
+                        binary,
+                        value,
+                        closest.getAbscissa(RIGHT),
+                        scale.toPixels(constants.dashProbeLength),
+                        scale);
+
+                if (dashes.x <= value.x + value.width + minLength) {
+                    continue;
+                }
+
+                final Staff staff = staffWithNotesNearest(
+                        system.getStavesAround(center),
+                        box.x,
+                        dashes.x,
+                        dashes.y,
+                        closest);
+                final Kind kind = (dashes.y < staff.getMidLine().yAt(box.x)) ? Kind.ALTA : Kind.BASSA;
+                final OctaveShiftInter os = new OctaveShiftInter(null, shape, kind, word.getGrade());
+                os.line = new Line2D.Double(value.x + value.width / 2, dashes.y, dashes.x, dashes.y);
+                os.dashed = true;
+                os.dashRow = dashes.y;
+                os.computeValueDimensions(sheet);
+                system.getSig().addVertex(os);
+                os.setStaff(staff);
+                word.remove();
+
+                for (Link link : os.searchLinks(system)) {
+                    link.applyTo(os);
+                }
+            }
+        }
+    }
+
+    private static Shape shapeOfLineWord (String word)
+    {
+        final Matcher matcher = LINE_WORD.matcher(word);
+
+        if (!matcher.lookingAt()) {
+            return null;
+        }
+
+        return switch (matcher.group(1)) {
+            case "8" -> Shape.OTTAVA;
+            case "15" -> Shape.QUINDICESIMA;
+            default -> Shape.VENTIDUESIMA;
+        };
+    }
+
     //-----------------------//
     // continueAcrossSystems //
     //-----------------------//
@@ -1174,8 +1259,12 @@ public class OctaveShiftInter
                 "Minimum vertical gap from upper or lower staff");
 
         private final Scale.Fraction dashProbeLength = new Scale.Fraction(
-                3.0,
-                "Length right of the value where the dashed line row is looked for");
+                6.0,
+                "Length right of the value, past its letters, where the line row is looked for");
+
+        private final Scale.Fraction wordValueWidth = new Scale.Fraction(
+                2.0,
+                "Width of the number and letters at the start of a word read from an octave line");
 
         private final Scale.Fraction continuationProbeLength = new Scale.Fraction(
                 6.0,
