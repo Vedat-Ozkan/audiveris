@@ -376,9 +376,36 @@ public class AlterInter
     private boolean isSmall (Scale scale)
     {
         return switch (shape) {
-            case SHARP, FLAT, NATURAL -> getBounds().height < scale.toPixels(constants.smallMaxHeight);
+            case SHARP, FLAT, NATURAL -> {
+                final int height = getBounds().height;
+                yield (height < scale.toPixels(constants.smallMaxHeight))
+                        && (height < (constants.smallToTypicalRatio.getValue() * typicalHeight()));
+            }
             default -> false;
         };
+    }
+
+    //---------------//
+    // typicalHeight //
+    //---------------//
+    /**
+     * Report the height of a normal sign of this shape on the same sheet, so that the size of
+     * a sign is judged against the font of its own score.
+     * Grace signs are in the minority, so the upper quartile is taken among the sheet signs.
+     *
+     * @return the upper quartile of heights, this sign's height if it has no SIG
+     */
+    private int typicalHeight ()
+    {
+        if (sig == null) {
+            return getBounds().height;
+        }
+
+        final int[] heights = sig.getSystem().getSheet().getSystems().stream()
+                .flatMap(system -> system.getSig().inters(shape).stream())
+                .mapToInt(inter -> inter.getBounds().height).sorted().toArray();
+
+        return (heights.length > 0) ? heights[heights.length * 3 / 4] : getBounds().height;
     }
 
     //-----------------//
@@ -645,6 +672,10 @@ public class AlterInter
         private final Scale.Fraction smallMaxHeight = new Scale.Fraction(
                 2.15,
                 "Maximum height of a sharp, flat or natural drawn at grace or cue size");
+
+        private final Constant.Ratio smallToTypicalRatio = new Constant.Ratio(
+                0.85,
+                "Maximum height of a grace or cue size sign, relative to typical signs of its shape");
 
         private final Constant.Double flatMassPitchOffset = new Constant.Double(
                 "pitch",
