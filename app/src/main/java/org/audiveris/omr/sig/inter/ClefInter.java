@@ -553,48 +553,38 @@ public class ClefInter
     {
         return new ClefDrawing(
                 constants.bassClefCenterPitch.getValue(),
+                -2,
                 constants.bassClefHeight.getValue(),
-                constants.smallBassClefHeight.getValue(),
-                constants.bassClefWidth.getValue(),
-                constants.smallBassClefWidth.getValue());
+                constants.bassClefWidth.getValue());
     }
 
     private static ClefDrawing trebleDrawing ()
     {
         return new ClefDrawing(
                 constants.trebleClefCenterPitch.getValue(),
+                2,
                 constants.trebleClefHeight.getValue(),
-                constants.smallTrebleClefHeight.getValue(),
-                constants.trebleClefWidth.getValue(),
-                constants.smallTrebleClefWidth.getValue());
+                constants.trebleClefWidth.getValue());
     }
 
     private record ClefDrawing (double centerPitch,
+                                double linePitch,
                                 double height,
-                                double smallHeight,
-                                double width,
-                                double smallWidth)
+                                double width)
     {
         boolean fits (Glyph glyph,
                       Staff staff)
         {
             final double interline = staff.getSpecificInterline();
-            final double offset = Math.abs(staff.pitchPositionOf(glyph.getCenter2D()) - centerPitch);
-            final double glyphHeight = glyph.getBounds().height / interline;
+            final double scale = glyph.getBounds().height / interline / height;
             final double glyphWidth = glyph.getBounds().width / interline;
+            final double scaledCenter = linePitch + ((centerPitch - linePitch) * scale);
+            final double offset = Math.abs(staff.pitchPositionOf(glyph.getCenter2D()) - scaledCenter);
 
-            return (offset <= constants.maxLineOffset.getValue())
-                    && (hasSize(glyphHeight, glyphWidth, height, width)
-                            || hasSize(glyphHeight, glyphWidth, smallHeight, smallWidth));
-        }
-
-        private static boolean hasSize (double glyphHeight,
-                                        double glyphWidth,
-                                        double height,
-                                        double width)
-        {
-            return (Math.abs(glyphHeight / height - 1) <= constants.heightTolerance.getValue())
-                    && (Math.abs(glyphWidth / width - 1) <= constants.widthTolerance.getValue());
+            return (scale >= constants.minClefScale.getValue())
+                    && (scale <= 1 + constants.heightTolerance.getValue())
+                    && (Math.abs(glyphWidth / (width * scale) - 1) <= constants.widthTolerance.getValue())
+                    && (offset <= constants.maxLineOffset.getValue());
         }
     }
 
@@ -840,24 +830,14 @@ public class ClefInter
                 3.5,
                 "Typical bass clef height");
 
-        private final Constant.Double smallBassClefHeight = new Constant.Double(
-                "interline",
-                2.8,
-                "Typical small bass clef height");
-
         private final Constant.Double bassClefWidth = new Constant.Double(
                 "interline",
                 2.7,
                 "Typical bass clef width");
 
-        private final Constant.Double smallBassClefWidth = new Constant.Double(
-                "interline",
-                2.1,
-                "Typical small bass clef width");
-
         private final Constant.Ratio heightTolerance = new Constant.Ratio(
                 0.12,
-                "Relative height tolerance for a drawn clef");
+                "Relative height tolerance above a full-size clef");
 
         private final Constant.Ratio widthTolerance = new Constant.Ratio(
                 0.2,
@@ -873,20 +853,14 @@ public class ClefInter
                 7.05,
                 "Typical treble clef height");
 
-        private final Constant.Double smallTrebleClefHeight = new Constant.Double(
-                "interline",
-                5.7,
-                "Typical small treble clef height");
-
         private final Constant.Double trebleClefWidth = new Constant.Double(
                 "interline",
                 2.65,
                 "Typical treble clef width");
 
-        private final Constant.Double smallTrebleClefWidth = new Constant.Double(
-                "interline",
-                2.05,
-                "Typical small treble clef width");
+        private final Constant.Ratio minClefScale = new Constant.Ratio(
+                0.65,
+                "Minimum size of a clef change relative to a full-size clef");
     }
 
     //----------//
