@@ -823,7 +823,7 @@ public class ClefInter
         private final Constant.Double maxLineOffset = new Constant.Double(
                 "pitch",
                 0.5,
-                "Maximum pitch offset of a clef centre from its typical pitch");
+                "Maximum pitch offset of a clef centre from the centre of a clef drawn at its size");
 
         private final Constant.Double bassClefHeight = new Constant.Double(
                 "interline",
